@@ -9,7 +9,7 @@ Developer reference:
 
 ## Visual Overview
 
-![Codai architecture](docs/image/architecture-codai.svg)
+![Codai architecture](docs/image/architechture-codai.svg)
 
 ![Codai flowchart](docs/image/Flowchart-codai.svg)
 
