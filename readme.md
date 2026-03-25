@@ -18,21 +18,23 @@ Codai/
 ├── dev/                    # Python backend (modular)
 │   ├── config.py           # Constants, CodaiConfig, external config loader
 │   ├── system.py           # Hardware detection, system info exposure
-│   ├── engine.py           # Process lifecycle, health monitor, auto-restart
+│   ├── engine.py           # Process lifecycle, ghost-process killer, limits
+│   ├── proxy.py            # Unified Reverse Proxy (concurrency, OOM safety)
 │   ├── controller.py       # Orchestrator (entry point)
 │   └── requirements.txt    # psutil
 ├── engine/                 # llama-server C++ binary + DLLs
 ├── models/                 # GGUF model file
 ├── ui/                     # Frontend (HTML/CSS/JS)
 │   ├── index.html
-│   ├── app.js              # Chat UI + SystemBridge polling
+│   ├── app.js              # Chat UI + Proxy Polling
 │   └── styles.css
 ├── logs/                   # Created at runtime
 │   ├── codai.log           # Application log (rotating, 5MB × 3)
-│   ├── engine.log          # llama-server stdout/stderr
-│   ├── system_info.json    # Real-time state (frontend reads this)
-│   └── codai.lock          # PID lock (instance protection)
+│   └── engine.log          # llama-server stdout/stderr
 ├── config.json             # Optional overrides (model, port, threads, ctx)
+
+# Debug mode: To enable verbose logging for development/testing, set "debug": true in config.json or set the environment variable CODAI_DEBUG=true before launching.
+├── logs/codai.lock         # Primary Instance lock
 ├── run.bat                 # Windows launcher
 ├── Codai.exe               # PyInstaller-compiled backend
 └── Codai.spec              # PyInstaller build spec
@@ -81,14 +83,15 @@ Priority: env vars > config.json > auto-detected defaults.
 ## Features
 
 - **Graceful shutdown** — `Ctrl+C` sends terminate → wait 3s → kill fallback
-- **Auto-restart** — engine crashes are detected and restarted (up to 3 attempts with backoff: 0s → 2s → 5s)
+- **Auto-restart** — engine crashes are detected and restarted. Over 3 crashes in 60s locks the queue.
 - **Health monitoring** — daemon thread checks process + port every 5 seconds
 - **Rotating logs** — `codai.log` rotates at 5 MB with 3 backups
 - **Engine logging** — `engine.log` captures all llama-server output
-- **Instance lock** — prevents duplicate backend instances via PID lock file
-- **Atomic state sync** — `system_info.json` written atomically (temp → rename)
-- **Frontend polling** — `SystemBridge` reads state every 2s with change detection
-- **Crash visibility** — frontend shows "Engine crashed — recovering..." with input disabled
+- **Instance lock** — prevents duplicate proxy instances via `codai_proxy.lock`
+- **Reverse Proxy** — All frontend requests pass through `proxy.py` adding `request_id` tracing and HTTP 429 backpressure queues.
+- **OOM Defense** — Mid-stream RAM polling automatically aborts text generation if system memory falls below 300MB.
+- **Frontend polling** — `SystemBridge` pings the `/health` API for atomic state updates.
+- **Crash visibility** — frontend rigidly reflects engine failures, parsing errors, and network disconnects.
 - **System info display** — footer shows model name, threads, context size
 - **Cross-platform ready** — auto-detects `.exe` on Windows, no extension on Linux/Mac
 
@@ -108,21 +111,26 @@ pyinstaller Codai.spec
 
 ## Frontend-Backend Communication
 
-The frontend polls `logs/system_info.json` for real-time state:
+The frontend coordinates with the **Python Reverse Proxy** via HTTP endpoints:
 
 ```json
+// GET http://127.0.0.1:8080/health
 {
-  "engine_status": "running",
-  "startup_phase": "ready",
-  "model_name": "gemma-3-1b-it-Q4_K_M.gguf",
-  "threads": 2,
-  "context_size": 1024,
-  "ram_tier": "Tier 2 (Standard)",
-  "last_update": "2026-03-25T06:22:00+00:00"
+  "status": "ok",
+  "engine": "running",
+  "proxy": "active",
+  "mode": "offline",
+  "queue": 0,
+  "memory": "stable",
+  "uptime": "25.3s",
+  "requests_handled": 3,
+  "debug": false
 }
 ```
 
 Status flow: `starting → loading_model → binding_port → running` (or `crashed → restarting → running`).
+
+All `/v1/chat/completions` API calls navigate the Proxy's `Semaphore(2)` queue. If overloaded, it responds with `HTTP 429 Too Many Requests` featuring a `Retry-After: 2` header, which the frontend autonomously parses and respects via auto-retry timers.
 
 ## License
 

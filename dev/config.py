@@ -32,7 +32,7 @@ LOG_BACKUP_COUNT: int = 3                # keep 3 rotated backups
 
 # Structured log format (Task 12: timestamp • level • module • message)
 LOG_FORMAT: str = (
-    "%(asctime)s.%(msecs)03d [%(levelname)-8s] %(name)-18s │ %(message)s"
+    "%(asctime)s.%(msecs)03d [%(levelname)-8s] %(name)-18s | %(message)s"
 )
 LOG_DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
@@ -78,6 +78,8 @@ class CodaiConfig:
         self.ram_tier: str = "unknown"
         self.ram_gb: float = 0.0
         self.cpu_cores: int = 1
+        self.debug: bool = False
+        self.log_level: str = "INFO"
 
     # ------------------------------------------------------------------
     # Task 8 (hardening): External config support
@@ -102,7 +104,7 @@ class CodaiConfig:
             logger.warning("Could not parse %s: %s — using defaults.", config_path, exc)
             return False
 
-        _ALLOWED = {"model_name", "threads", "ctx", "port", "host"}
+        _ALLOWED = {"model_name", "threads", "ctx", "port", "host", "debug", "log_level"}
         applied: list[str] = []
         for key in _ALLOWED:
             if key in data:
@@ -122,6 +124,8 @@ class CodaiConfig:
             "CODAI_MODEL": ("model_name", str),
             "CODAI_CTX": ("ctx", int),
             "CODAI_THREADS": ("threads", int),
+            "CODAI_DEBUG": ("debug", lambda x: str(x).lower() in ("true", "1", "yes")),
+            "CODAI_LOG_LEVEL": ("log_level", str),
         }
         for env_key, (attr, cast) in mapping.items():
             val = os.environ.get(env_key)

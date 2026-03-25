@@ -17,10 +17,10 @@ Portable offline AI coding assistant for students on legacy college hardware.
 | Component | Technology | RAM Footprint |
 |-----------|-----------|--------------|
 | **AI Engine** | llama-server.exe (Native C++) | Extremely Low |
-| **Backend** | Python 4-module system (config, system, engine, controller) | Low |
-| **Frontend** | HTML5 / Vanilla JS + SystemBridge polling | Near Zero |
+| **Backend** | Python 5-module system (config, system, engine, proxy, controller) | Low |
+| **Frontend** | HTML5 / Vanilla JS + HTTP `/health` polling for periodic health checks | Near Zero |
 | **Styling** | Vanilla CSS (dark theme, developer UX) | Near Zero |
-| **State Sync** | system_info.json (atomic writes, 2s polling) | Near Zero |
+| **State Sync** | REST for commands + SSE chunking for real-time state/streaming (chat, logs) | Near Zero |
 
 ### 3. Model Distribution
 
@@ -33,9 +33,10 @@ Portable offline AI coding assistant for students on legacy college hardware.
 | Module | Purpose | Key Features |
 |--------|---------|-------------|
 | `config.py` | Configuration | External config.json + env vars, cross-platform binary detection, constants |
-| `system.py` | Hardware | RAM/CPU detection, CPU-aware threads, atomic system_info.json writes |
-| `engine.py` | Process | Graceful shutdown, health monitor, auto-restart (backoff), instance lock |
-| `controller.py` | Orchestrator | Structured logging (rotation), signal-based shutdown, startup phases |
+| `system.py` | Hardware | RAM/CPU detection, CPU-aware threads |
+| `engine.py` | Process | Graceful shutdown, ghostly process locks, auto-restart limits |
+| `proxy.py` | Gateway | HTTP Semaphore Queues, Request TraceIDs, RAM limits, Timeout limits |
+| `controller.py` | Orchestrator | Structured logging (rotation), Singleton PID locks, startup phases |
 
 ### 5. Reliability & Safety
 
@@ -45,17 +46,18 @@ Portable offline AI coding assistant for students on legacy college hardware.
 | Auto-restart | 3 attempts with backoff (0s → 2s → 5s) |
 | Health monitor | Process + port check every 5s (daemon thread, thread-safe) |
 | Log rotation | 5 MB × 3 backups (RotatingFileHandler) |
-| Instance lock | PID-based codai.lock with stale detection |
-| Atomic state | tempfile → os.replace for system_info.json |
+| Instance lock | PID-based codai_proxy.lock with stale detection |
+| Reverse Proxy | HTTP 429 Backpressure queues, unified 500 error templates |
 | Port conflict | Pre-boot detection with actionable error |
 
 ### 6. Frontend Integration
 
 | Feature | Implementation |
 |---------|---------------|
-| State sync | SystemBridge polls system_info.json every 2s |
+| State sync | SystemBridge polls proxy `/health` every 2s |
+|             | **SystemBridge:** a frontend service/component that polls the proxy `/health` endpoint every 2s to synchronize system state with the UI. See also: Frontend Architecture section. |
 | Status mapping | Engine status → human-readable messages in header |
-| Crash UX | Red notification banner, input disabled, auto-recovery |
+| Crash UX | Strict JSON parsing + interrupted connection traps |
 | Restart UX | Amber spinner notification |
 | System info | Footer: "model • threads • ctx" |
 | Streaming | Token-by-token with 35ms batch rendering + cursor |

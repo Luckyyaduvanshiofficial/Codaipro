@@ -352,3 +352,26 @@ textarea::placeholder { color: var(--text-tertiary); font-weight: 400; }
 .input-box.disabled {
     opacity: 0.5; pointer-events: none;
 }
+.dev-link {
+    color: var(--accent-secondary);
+    text-decoration: none;
+    font-size: 0.75rem;
+    opacity: 0.7;
+    transition: opacity var(--ease-standard);
+    margin-left: 5px;
+}
+.dev-link:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+.separator {
+    margin: 0 8px;
+    color: var(--text-tertiary);
+    font-size: 0.8rem;
+}
+
+.dev-separator {
+    margin: 0 8px;
+    color: var(--text-tertiary);
+    font-size: 0.8rem;
+}

@@ -6,25 +6,128 @@
 // ----------------------------------------------------
 // STATE MANAGEMENT & CONSTANTS
 // ----------------------------------------------------
+
 const State = {
-    chatHistory: [{ role: "system", content: "You are Codai Pro, an exceptionally precise offline AI coding assistant. Run securely and locally." }],
+    systemPrompt: "You are Codai Pro. Be brief, direct, and local.",
     isGenerating: false,
     hasStartedChat: false,
     abortController: null,
-    maxHistory: 12,
     userIsReading: false,
-    activeTimers: [],
     engineStatus: "unknown",
     startupPhase: "initializing",
-    backendPort: 8080
+    lastRequestId: null,
+    backendPort: 8080,
+    get backendUrl() {
+        return window.location.protocol === "file:" ? `http://127.0.0.1:${this.backendPort}` : window.location.origin;
+    },
+    get engineUrl() {
+        return `http://127.0.0.1:${this.backendPort + 1}/`;
+    }
 };
 
-const TYPING_MESSAGES = [
-    { time: 0, text: "Waking up Local CPU Engine..." },
-    { time: 1000, text: "Analyzing code context..." },
-    { time: 3500, text: "Generating response natively..." },
-    { time: 10000, text: "Response is taking longer due to hardware limits..." }
-];
+const FRONTEND_ERROR_COOLDOWN_MS = 4000;
+const FrontendErrorState = {
+    lastSignature: "",
+    lastSentAt: 0,
+};
+
+function isEnvelope(payload) {
+    return Boolean(payload)
+        && typeof payload === "object"
+        && typeof payload.status === "string"
+        && typeof payload.request_id === "string"
+        && Object.prototype.hasOwnProperty.call(payload, "data")
+        && Object.prototype.hasOwnProperty.call(payload, "error");
+}
+
+async function readEnvelope(response) {
+    const payload = await response.json();
+    if (!isEnvelope(payload)) {
+        throw new Error("Invalid response envelope");
+    }
+    State.lastRequestId = payload.request_id;
+    return payload;
+}
+
+function extractErrorMessage(payload, fallback) {
+    if (payload?.error?.message) return payload.error.message;
+    if (typeof payload?.data?.message === "string") return payload.data.message;
+    return fallback;
+}
+
+function extractAssistantText(payload) {
+    const choice = payload?.choices?.[0];
+    return (
+        choice?.message?.content
+        || choice?.text
+        || choice?.content
+        || payload?.output_text
+        || ""
+    );
+}
+
+function forwardFrontendError(kind, details) {
+    const signature = `${kind}:${details.message || "unknown"}:${details.stack || ""}`;
+    const now = Date.now();
+    const isDuplicate = signature === FrontendErrorState.lastSignature;
+    const isCoolingDown = now - FrontendErrorState.lastSentAt < FRONTEND_ERROR_COOLDOWN_MS;
+
+    if (isDuplicate && isCoolingDown) {
+        return;
+    }
+
+    FrontendErrorState.lastSignature = signature;
+    FrontendErrorState.lastSentAt = now;
+
+    fetch(`${State.backendUrl}/frontend-error`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            kind,
+            ...details,
+        }),
+    }).catch(error => console.error("Could not forward error to proxy:", error));
+}
+
+// Requirement 15: Cross-Tab Session Isolation Lock
+const SESSION_LOCK_ID = "codai_tab_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+State.lockTimer = setInterval(() => {
+    const time = parseInt(localStorage.getItem('codai_tab_time') || "0");
+    const active = localStorage.getItem('codai_active_tab');
+    if (!active || active === SESSION_LOCK_ID || (Date.now() - time) > 3000) {
+        localStorage.setItem('codai_active_tab', SESSION_LOCK_ID);
+        localStorage.setItem('codai_tab_time', Date.now().toString());
+        const m = document.getElementById("tab-lock-modal");
+        if (m) m.remove();
+    } else {
+        if (!document.getElementById("tab-lock-modal")) {
+            const m = document.createElement("div");
+            m.id = "tab-lock-modal";
+            m.className = "tab-lock-modal";
+            m.innerHTML = "<div>⚠️<br><br>Another Codai tab is actively communicating with the runtime.<br><span style='font-size:1rem;color:#888;'>Please close this tab or the other to prevent queue collision.</span></div>";
+            document.body.appendChild(m);
+        }
+    }
+}, 1000);
+
+// Global Error Catching
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error("Global JS Error:", message, source, lineno, colno, error);
+    forwardFrontendError("window.onerror", {
+        message: `JS Error: ${message}`,
+        source,
+        lineno,
+        colno,
+        stack: error ? error.stack : "",
+    });
+};
+window.addEventListener('unhandledrejection', function(event) {
+    console.error("Unhandled Promise Rejection:", event.reason);
+    forwardFrontendError("unhandledrejection", {
+        message: `Promise Rejection: ${event.reason?.message || event.reason}`,
+        stack: event.reason?.stack || "",
+    });
+});
 
 // Engine status → UI mapping
 const STATUS_MAP = {
@@ -51,14 +154,15 @@ const PHASE_MAP = {
 };
 
 // ----------------------------------------------------
-// SYSTEM BRIDGE — Real-time backend polling
+// SYSTEM BRIDGE — Real-time backend health polling
+// Polls llama-server /health endpoint (works with file:// protocol)
+// Future-proof: can be swapped to WebSocket or system_info.json API
 // ----------------------------------------------------
 const SystemBridge = {
     _pollTimer: null,
-    _lastUpdate: null,
     _consecutiveErrors: 0,
-    _maxErrors: 5,
-    _pollInterval: 2000,
+    _maxErrors: 10,
+    _pollInterval: 4000,
 
     els: {
         notification: null,
@@ -72,7 +176,7 @@ const SystemBridge = {
     },
 
     startPolling() {
-        this._poll();  // immediate first poll
+        this._poll();
         this._pollTimer = setInterval(() => this._poll(), this._pollInterval);
     },
 
@@ -85,80 +189,78 @@ const SystemBridge = {
 
     async _poll() {
         try {
-            const response = await fetch('../logs/system_info.json?t=' + Date.now(), {
-                cache: 'no-store'
+            const response = await fetch(`${State.backendUrl}/health`, {
+                method: 'GET',
+                signal: AbortSignal.timeout(3000)
             });
 
             if (!response.ok) {
-                this._handlePollError();
-                return;
+                throw new Error(`HTTP ${response.status}`);
             }
 
-            let data;
-            try {
-                data = await response.json();
-            } catch (parseErr) {
-                // Partial/corrupt read — skip this cycle (atomic writes should prevent this)
-                return;
-            }
+            const envelope = await readEnvelope(response);
+            const data = envelope.data || {};
 
+            if (Number.isFinite(Number(data.proxy_port))) {
+                State.backendPort = Number(data.proxy_port);
+            }
+            const engineLink = document.getElementById('engine-ui-link');
+            if (engineLink) {
+                engineLink.href = State.engineUrl;
+            }
             this._consecutiveErrors = 0;
+            State.startupPhase = data.phase || State.startupPhase;
 
-            // Change detection — skip DOM updates if nothing changed
-            if (data.last_update && data.last_update === this._lastUpdate) {
-                return;
-            }
-            this._lastUpdate = data.last_update;
-
-            // Update backend port if it changed
-            if (data.port) {
-                State.backendPort = data.port;
+            if (data.debug && !this._devLoggerActive) {
+                this._devLoggerActive = true;
+                console.info("[SYSTEM] Debug mode detected. Logs available at /logs");
             }
 
-            requestAnimationFrame(() => this._applyState(data));
+            const displayStatus = data.engine === 'running'
+                ? 'running'
+                : (data.engine_display || (data.phase === 'crashed' ? 'crashed' : 'starting'));
 
+            requestAnimationFrame(() => this._applyState(displayStatus));
+
+            if (this.els.infoBar) {
+                const queueSuffix = data.queue ? ` • Queue: ${data.queue}` : '';
+                this.els.infoBar.innerText = `${PHASE_MAP[data.phase] || 'System active'} • Uptime: ${data.uptime || 'n/a'}${queueSuffix}`;
+            }
+
+            if (data.engine === 'running') {
+                this._hideNotification();
+                this._setInputEnabled(true);
+            }
         } catch (err) {
-            this._handlePollError();
+            this._handlePollError(err);
         }
     },
 
-    _handlePollError() {
+    _handlePollError(err) {
+        if (err) console.error("SystemBridge Polling Error:", err.message || err);
+
         this._consecutiveErrors++;
         if (this._consecutiveErrors >= this._maxErrors && State.engineStatus !== 'crashed') {
             State.engineStatus = 'crashed';
             requestAnimationFrame(() => {
                 this._updateStatus('crashed');
-                this._showNotification('Backend not responding. Is the server running?', 'error');
+                this._showNotification('Backend not reachable', 'error');
                 this._setInputEnabled(false);
             });
         }
     },
 
-    _applyState(data) {
+    _applyState(newStatus) {
         const prevStatus = State.engineStatus;
-        const newStatus = data.engine_status || 'unknown';
         State.engineStatus = newStatus;
-        State.startupPhase = data.startup_phase || 'initializing';
 
-        // 1. Update system info bar
-        this._updateInfoBar(data);
-
-        // 2. Skip status indicator update if user is mid-stream
         if (!State.isGenerating) {
             this._updateStatus(newStatus);
         }
 
-        // 3. Handle state transitions
         if (prevStatus !== newStatus) {
             this._handleTransition(prevStatus, newStatus);
         }
-    },
-
-    _updateInfoBar(data) {
-        if (!this.els.infoBar) return;
-        const model = (data.model_name || 'unknown').replace('.gguf', '').replace(/-/g, ' ');
-        const shortModel = model.length > 24 ? model.substring(0, 24) + '…' : model;
-        this.els.infoBar.textContent = `${shortModel} • ${data.threads || '?'} threads • ${data.context_size || '?'} ctx`;
     },
 
     _updateStatus(status) {
@@ -167,32 +269,17 @@ const SystemBridge = {
     },
 
     _handleTransition(prev, next) {
-        // Crash detection
         if (next === 'crashed') {
             this._showNotification('Engine crashed — attempting recovery...', 'error');
             this._setInputEnabled(false);
-            // If streaming, abort the fetch
             if (State.isGenerating && State.abortController) {
                 State.abortController.abort();
             }
         }
 
-        // Restart visibility
-        if (next === 'restarting') {
-            this._showNotification('Engine restarting...', 'warning', true);
-            this._setInputEnabled(false);
-        }
-
-        // Recovery: re-enable input
-        if (next === 'running' && (prev === 'crashed' || prev === 'restarting' || prev === 'starting' || prev === 'unknown')) {
+        if (next === 'running' && (prev === 'crashed' || prev === 'loading_model' || prev === 'unknown' || prev === 'starting')) {
             this._hideNotification();
             this._setInputEnabled(true);
-        }
-
-        // Startup phases
-        if (next === 'starting' || next === 'unknown') {
-            const phaseText = PHASE_MAP[State.startupPhase] || 'Starting...';
-            this._showNotification(phaseText, 'warning', true);
         }
     },
 
@@ -211,11 +298,7 @@ const SystemBridge = {
     _setInputEnabled(enabled) {
         const inputBox = document.getElementById('input-box');
         if (!inputBox) return;
-        if (enabled) {
-            inputBox.classList.remove('disabled');
-        } else {
-            inputBox.classList.add('disabled');
-        }
+        inputBox.classList.toggle('disabled', !enabled);
     }
 };
 
@@ -238,6 +321,16 @@ const UI = {
 
     init() {
         this.setupEventListeners();
+        if (window.location.protocol !== "file:") {
+            const currentPort = Number(window.location.port);
+            if (Number.isFinite(currentPort) && currentPort > 0) {
+                State.backendPort = currentPort;
+            }
+        }
+        const engineLink = document.getElementById('engine-ui-link');
+        if (engineLink) {
+            engineLink.href = State.engineUrl;
+        }
         this.els.input.focus();
     },
 
@@ -314,7 +407,7 @@ const UI = {
         if (isGenerating) {
             this.els.btnSend.classList.add('hidden');
             this.els.btnStop.classList.remove('hidden');
-            this.updateStatus("Streaming response...", "streaming");
+            this.updateStatus("Generating...", "streaming");
         } else {
             this.els.btnSend.classList.remove('hidden');
             this.els.btnStop.classList.add('hidden');
@@ -351,46 +444,13 @@ const UI = {
         bubble.style.whiteSpace = "pre-wrap";
     },
 
-    startTypingIndicator() {
-        UI.clearTimers(); // Memory safety 
-        const { row, bubble } = this.createBubble(false);
-        row.id = 'active-indicator';
-        
-        bubble.innerHTML = `
-            <div class="dynamic-indicator">
-                <div class="loading-spinner"></div>
-                <span class="indicator-text" id="indicator-text">Initializing Request...</span>
-            </div>
-        `;
-        
-        const textNode = bubble.querySelector('#indicator-text');
-        
-        TYPING_MESSAGES.forEach(msg => {
-            const timer = setTimeout(() => {
-                if (textNode) textNode.textContent = msg.text;
-            }, msg.time);
-            State.activeTimers.push(timer);
-        });
-        
-        return bubble;
-    },
-
-    removeTypingIndicator() {
-        UI.clearTimers();
-        const row = document.getElementById('active-indicator');
-        if (row) row.remove();
-    },
-
     clearTimers() {
-        State.activeTimers.forEach(clearTimeout);
-        State.activeTimers = [];
+        return;
     },
 
     renderError(msg, originalPrompt) {
         const { bubble } = this.createBubble(false);
-        // Double escaping logic prevents XSS injection via URL or prompts
-        const safePrompt = encodeURIComponent(originalPrompt); 
-        
+        // Keep error handling minimal and fast.
         bubble.innerHTML = `
             <div class="error-card">
                 <div class="error-text">
@@ -398,7 +458,6 @@ const UI = {
                     System Error: ${this.escapeInline(msg)}
                 </div>
                 <div class="error-actions">
-                    <button class="retry-btn ripple" onclick="window.retryPrompt('${safePrompt}')">Retry Sequence</button>
                     <button class="retry-btn ripple" onclick="this.parentElement.parentElement.remove()" style="border-color: var(--text-tertiary); color: var(--text-tertiary);">Dismiss</button>
                 </div>
             </div>
@@ -420,6 +479,11 @@ const UI = {
         // 'stopped' naturally falls back to default style
     },
 
+    // New function for system messages (as per instruction)
+    showSystemMessage(message, type = 'default') {
+        SystemBridge._showNotification(message, type);
+    },
+
     scrollBottom() {
         if (!State.userIsReading) {
             this.els.chatArea.scrollTo({ top: this.els.chatArea.scrollHeight, behavior: 'smooth' });
@@ -428,154 +492,116 @@ const UI = {
 };
 
 // ----------------------------------------------------
-// API & STREAMING ENGINE (CRITICAL CPU OPTIMIZATION)
+// API ENGINE (LOW-LATENCY SINGLE-SHOT MODE)
 // ----------------------------------------------------
 const API = {
     async handleSend() {
-        const text = UI.els.input.value.trim();
-        if (!text || State.isGenerating) return;
+        const promptText = UI.els.input.value.trim();
+        if (!promptText || State.isGenerating) return;
 
-        UI.toggleIOState(true);
+        UI.clearTimers();
         UI.els.input.value = '';
         UI.els.charLimitWarning.classList.remove('visible');
-        
         UI.hideEmptyState();
-        UI.appendUser(text);
+        UI.appendUser(promptText);
 
-        State.chatHistory.push({ role: "user", content: text });
-        if (State.chatHistory.length > State.maxHistory) {
-            State.chatHistory.splice(1, 2);
-        }
+        UI.toggleIOState(true);
 
-        await new Promise(r => setTimeout(r, 100)); // Natural interaction delay
-        UI.startTypingIndicator();
-        
         State.abortController = new AbortController();
         const startTime = performance.now();
-        let aiCompleteText = "";
         let finalBubbleReference = null;
+        const completionBudget = promptText.length <= 20 ? 128 : promptText.length <= 120 ? 160 : 224;
 
         try {
-            const response = await fetch(`http://127.0.0.1:${State.backendPort}/v1/chat/completions`, {
+            const response = await fetch(`${State.backendUrl}/v1/chat/completions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 signal: State.abortController.signal,
                 body: JSON.stringify({
-                    messages: State.chatHistory,
+                    messages: [
+                        { role: "system", content: State.systemPrompt },
+                        { role: "user", content: promptText }
+                    ],
                     temperature: 0.1,
-                    stream: true
+                    max_tokens: completionBudget,
+                    stream: false
                 })
             });
 
-            UI.removeTypingIndicator();
+            const envelope = await readEnvelope(response);
+            const errText = extractErrorMessage(
+                envelope,
+                `Backend not reachable (HTTP ${response.status})`
+            );
+            if (!response.ok || envelope.status !== "ok") {
+                UI.showSystemMessage(errText, 'error');
+                UI.renderError(errText, promptText);
+                return;
+            }
 
-            if (!response.ok) throw new Error(response.status === 404 ? 'invalid_endpoint' : 'offline');
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder("utf-8");
-            
             const { bubble: answerBubble } = UI.createBubble(false);
             finalBubbleReference = answerBubble;
-            
-            const streamBox = document.createElement('div');
-            streamBox.className = "streaming-text";
-            
-            // UX Polish: Blinking cursor
-            const cursor = document.createElement('span');
-            cursor.className = 'cursor-blink';
-            
-            answerBubble.appendChild(streamBox);
-            answerBubble.appendChild(cursor);
-            
-            let accumulatedVisibleStr = "";
-            let streamBufferTime = performance.now();
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const dataStr = line.substring(6).trim();
-                        if (dataStr === '[DONE]') continue;
-
-                        try {
-                            const data = JSON.parse(dataStr);
-                            const token = data.choices[0].delta?.content;
-                            if (token) {
-                                aiCompleteText += token;
-                                accumulatedVisibleStr += token;
-                                
-                                const now = performance.now();
-                                if (now - streamBufferTime > 35) { // 35ms batch rendering
-                                    streamBox.textContent = accumulatedVisibleStr;
-                                    streamBufferTime = now;
-                                    UI.scrollBottom();
-                                }
-                            }
-                        } catch (e) { /* Suppress */ }
-                    }
-                }
+            const aiCompleteText = extractAssistantText(envelope.data).trim();
+            if (!aiCompleteText) {
+                throw new Error("Model returned malformed or empty output.");
             }
-            
-            cursor.remove();
-            streamBox.textContent = accumulatedVisibleStr; // final flush
-            API.finalizeResponse(aiCompleteText, startTime, finalBubbleReference, false);
 
+            this.finalizeResponse(aiCompleteText, startTime, finalBubbleReference, false);
         } catch (err) {
-            UI.removeTypingIndicator();
-            
+            UI.clearTimers();
+
             if (err.name === 'AbortError') {
-                if (aiCompleteText.trim().length > 0) {
-                    API.finalizeResponse(aiCompleteText, startTime, finalBubbleReference, true);
-                } else {
-                    State.chatHistory.pop(); 
-                    if(finalBubbleReference) finalBubbleReference.parentElement.remove();
-                    UI.updateStatus('Stopped', 'default');
+                if (finalBubbleReference?.parentElement) {
+                    finalBubbleReference.parentElement.remove();
                 }
-            } else {
-                console.error("Critical Engine Error:", err);
-                let errMsg = 'Model returned malformed or unexpected output.';
-                if (err.message === 'invalid_endpoint' || err.message === 'offline' || err.message.includes('fetch')) {
-                    errMsg = `Local AI engine not running on port ${State.backendPort}. Start the backend server.`;
-                } else if (err.message.includes('timeout')) {
-                    errMsg = 'Response took too long and timed out due to CPU constraints.';
-                }
-                UI.renderError(errMsg, text);
-                State.chatHistory.pop();
-                // Don't override status if SystemBridge already shows crash
-                if (State.engineStatus !== 'crashed') {
-                    UI.updateStatus('Engine Offline', 'offline');
-                }
+                UI.updateStatus('Stopped', 'default');
+                return;
+            }
+
+            console.error("Critical Engine Error:", err);
+            const errMsg = err.message?.includes('timeout')
+                ? 'Response took too long and timed out due to CPU constraints.'
+                : (err.message || 'Model returned malformed or unexpected output.');
+
+            if (finalBubbleReference?.parentElement) {
+                finalBubbleReference.parentElement.remove();
+            }
+
+            UI.renderError(errMsg, promptText);
+            UI.showSystemMessage(errMsg, 'error');
+            if (State.engineStatus !== 'crashed') {
+                UI.updateStatus('Engine Offline', 'offline');
             }
         } finally {
+            UI.clearTimers();
             UI.toggleIOState(false);
+            State.abortController = null;
             UI.els.input.focus();
         }
     },
 
     stopGeneration() {
+        UI.clearTimers();
         if (State.abortController) {
             State.abortController.abort();
-            UI.updateStatus("Stopped", "default");
         }
+        UI.updateStatus("Stopped", "default");
     },
 
     finalizeResponse(text, startTime, bubbleElem, wasAborted) {
         if (!text) return;
-
-        State.chatHistory.push({ role: "assistant", content: text });
         
         const timeSecs = ((performance.now() - startTime) / 1000).toFixed(1);
         
-        // Safety Fallback for unformatted models
-        text = Markdown.applyCodeFallback(text);
-        
-        // Strict, Safe Markdown Rendering
-        bubbleElem.innerHTML = Markdown.parse(text);
+        // Fast path for plain responses; keep markdown parsing only when needed.
+        const needsMarkdown = /```|`[^`\n]+`|\*\*[^*]+\*\*|^[ \t]*[-*]\s/m.test(text);
+        if (needsMarkdown) {
+            text = Markdown.applyCodeFallback(text);
+            bubbleElem.innerHTML = Markdown.parse(text);
+        } else {
+            bubbleElem.textContent = text;
+            bubbleElem.style.whiteSpace = "pre-wrap";
+        }
         
         // Construction of meta-footer
         const meta = document.createElement('div');
@@ -718,13 +744,6 @@ window.useSuggestion = (text) => {
     UI.els.input.value = text;
     UI.els.input.dispatchEvent(new Event('input', { bubbles: true }));
     UI.els.input.focus();
-    API.handleSend();
-};
-
-window.retryPrompt = (encodedText) => {
-    UI.els.input.value = decodeURIComponent(encodedText);
-    UI.els.input.dispatchEvent(new Event('input'));
-    document.querySelector('.error-card').parentElement.remove();
     API.handleSend();
 };
 

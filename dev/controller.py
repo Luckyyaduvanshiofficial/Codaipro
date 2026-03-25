@@ -1,8 +1,10 @@
 """
 Codai Pro — Controller Module
-Thin orchestrator: wires config → system → engine → UI lifecycle.
-Structured logging with rotation, signal-based shutdown, startup phase tracking.
+Wires configuration, runtime analysis, proxy startup, engine lifecycle,
+and graceful shutdown into one orchestrated flow.
 """
+
+from __future__ import annotations
 
 import logging
 import logging.handlers
@@ -12,13 +14,14 @@ import sys
 import threading
 import webbrowser
 
-from dev.config import (
-    CodaiConfig,
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from dev.config import (  # noqa: E402
     CONFIG_FILENAME,
-    LOG_BACKUP_COUNT,
     LOG_DATE_FORMAT,
     LOG_FORMAT,
-    LOG_MAX_BYTES,
     PHASE_ANALYZING_HW,
     PHASE_BINDING_PORT,
     PHASE_CRASHED,
@@ -26,11 +29,12 @@ from dev.config import (
     PHASE_LOADING_MODEL,
     PHASE_READY,
     PHASE_SHUTTING_DOWN,
-    ensure_log_directory,
+    CodaiConfig,
     get_base_path,
 )
-from dev.engine import EngineManager
-from dev.system import analyze_system_resources, write_system_info
+from dev.engine import EngineManager  # noqa: E402
+from dev.proxy import CodaiProxyHandler, CodaiProxyServer  # noqa: E402
+from dev.system import analyze_system_resources  # noqa: E402
 
 logger = logging.getLogger("codai")
 
@@ -42,197 +46,230 @@ class CodaiController:
         self.config = CodaiConfig()
         self.base_path = get_base_path()
         self.engine: EngineManager | None = None
+        self._proxy: CodaiProxyServer | None = None
+        self._proxy_thread: threading.Thread | None = None
         self._shutdown_event = threading.Event()
-        self._current_phase: str = PHASE_INITIALIZING
+        self._current_phase = PHASE_INITIALIZING
 
-    # ------------------------------------------------------------------
-    # Startup phase tracking  (Task 9 hardening)
-    # ------------------------------------------------------------------
-    def _set_phase(self, phase: str, engine_status: str = "unknown") -> None:
-        """Update current phase and sync system_info.json for frontend."""
-        self._current_phase = phase
-        logger.info("Phase → %s", phase)
-        write_system_info(
-            self.config, self.base_path,
-            engine_status=engine_status,
-            startup_phase=phase,
-        )
-
-    # ------------------------------------------------------------------
-    # Engine status change callback  (Task 7 hardening: crash visibility)
-    # ------------------------------------------------------------------
-    def _on_engine_status_change(self, status: str) -> None:
-        """Called by EngineManager whenever engine status changes.
-
-        Updates system_info.json so the frontend can display:
-            ``"Engine crashed, restarting…"``
-        """
-        phase = self._current_phase
-        if status == "crashed":
-            phase = PHASE_CRASHED
-        elif status == "running":
-            phase = PHASE_READY
-        write_system_info(
-            self.config, self.base_path,
-            engine_status=status,
-            startup_phase=phase,
-        )
-
-    # ------------------------------------------------------------------
-    # Structured logging with rotation  (Tasks 3 & 12 hardening)
-    # ------------------------------------------------------------------
     def _setup_logging(self) -> None:
-        """Configure logging to console + rotating ``logs/codai.log``."""
-        log_dir = ensure_log_directory(self.base_path)
-        log_file = os.path.join(log_dir, "codai.log")
-
+        """Configure console and rotating file logging safely."""
+        level_name = getattr(self.config, "log_level", "INFO").upper()
+        level = getattr(logging, level_name, logging.INFO)
         root = logging.getLogger()
-        root.setLevel(logging.DEBUG)
+        root.setLevel(level)
 
-        # Prevent duplicate handlers on re-entry
-        if root.handlers:
-            return
+        for handler in list(root.handlers):
+            root.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
 
-        # Console handler
-        console = logging.StreamHandler(sys.stdout)
-        console.setLevel(logging.INFO)
-        console.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT))
-        root.addHandler(console)
+        log_dir = os.path.join(self.base_path, "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, "codai.log")
 
-        # Rotating file handler (Task 3 hardening: 5 MB, 3 backups)
+        formatter = logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT)
+
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(level)
+        console_handler.setFormatter(formatter)
+        root.addHandler(console_handler)
+
         file_handler = logging.handlers.RotatingFileHandler(
-            log_file,
-            maxBytes=LOG_MAX_BYTES,
-            backupCount=LOG_BACKUP_COUNT,
+            log_path,
+            maxBytes=5 * 1024 * 1024,
+            backupCount=3,
             encoding="utf-8",
         )
         file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT))
+        file_handler.setFormatter(formatter)
         root.addHandler(file_handler)
 
-        logger.info("Logging initialised → %s (rotation: %dMB × %d backups)",
-                     log_file, LOG_MAX_BYTES // (1024 * 1024), LOG_BACKUP_COUNT)
+        logger.info("Logging initialized -> %s", log_path)
+        logger.info("Log level -> %s", level_name)
 
-    # ------------------------------------------------------------------
-    # UI launcher
-    # ------------------------------------------------------------------
-    def _launch_ui(self) -> None:
-        """Open the web interface in the default browser."""
-        ui_path = os.path.join(self.base_path, "ui", "index.html")
-        if not os.path.exists(ui_path):
-            raise FileNotFoundError(f"UI interface missing: {ui_path}")
+    def _set_phase(
+        self,
+        phase: str,
+        *,
+        engine_status: str = "unknown",
+        error_message: str = "",
+    ) -> None:
+        self._current_phase = phase
+        if self._proxy:
+            self._proxy.startup_phase = phase
+            self._proxy.engine_status = engine_status
+            self._proxy.error_message = error_message
+        logger.info("Lifecycle phase -> %s (engine=%s)", phase, engine_status)
 
-        logger.info("Opening interface in default browser...")
-        try:
-            webbrowser.open(f"file://{ui_path}")
-        except Exception as exc:
-            logger.warning("Could not open browser: %s", exc)
-            logger.info("Please open manually: file://%s", ui_path)
+    def _on_engine_status_change(self, status: str) -> None:
+        phase = self._current_phase
+        error_message = ""
 
-    # ------------------------------------------------------------------
-    # Signal-based shutdown (replaces input())
-    # ------------------------------------------------------------------
+        if status == "running":
+            phase = PHASE_READY
+        elif status in {"failed", "crashed"}:
+            phase = PHASE_CRASHED
+            error_message = "Engine process terminated unexpectedly."
+        elif status == "shutting_down":
+            phase = PHASE_SHUTTING_DOWN
+
+        self._set_phase(phase, engine_status=status, error_message=error_message)
+
+    def _on_engine_crash(self, reason: str) -> None:
+        logger.critical("Engine unrecoverable: %s", reason)
+        self._set_phase(PHASE_CRASHED, engine_status="crashed", error_message=reason)
+        self._shutdown_event.set()
+
     def _register_signals(self) -> None:
-        """Handle SIGINT / SIGTERM for clean shutdown."""
-        def _handler(signum: int, _frame) -> None:  # type: ignore[override]
-            sig_name = signal.Signals(signum).name
-            logger.info("Received %s — initiating shutdown...", sig_name)
+        def _handler(signum: int, _frame: object) -> None:
+            logger.info("Received %s - shutting down...", signal.Signals(signum).name)
             self._shutdown_event.set()
 
         signal.signal(signal.SIGINT, _handler)
         signal.signal(signal.SIGTERM, _handler)
 
-    # ------------------------------------------------------------------
-    # Main lifecycle
-    # ------------------------------------------------------------------
+    def _launch_ui(self) -> None:
+        url = f"http://127.0.0.1:{self.config.port}/"
+        try:
+            webbrowser.open(url)
+            logger.info("Opening interface -> %s", url)
+        except Exception as exc:
+            logger.warning("Could not open browser automatically: %s", exc)
+            logger.info("Open manually -> %s", url)
+
+    def _print_banner(self) -> None:
+        logger.info("")
+        logger.info("  " + "=" * 46)
+        logger.info("   CODAI PRO IS ACTIVE AND LISTENING")
+        logger.info("  " + "=" * 46)
+        logger.info("   Interface  -> http://127.0.0.1:%s", self.config.port)
+        logger.info("   Telemetry  -> http://127.0.0.1:%s/telemetry", self.config.port)
+        logger.info("   Engine UI  -> http://127.0.0.1:%s", self.config.port + 1)
+        logger.info("  " + "=" * 46)
+        logger.info("   Press Ctrl+C to shut down safely.")
+        logger.info("")
+
     def run(self) -> None:
-        """Execute the full Codai lifecycle pipeline."""
         try:
             self._setup_logging()
-
             logger.info("=" * 48)
-            logger.info("        CODAI PRO — AI INITIATED")
+            logger.info("        CODAI PRO - AI INITIATED")
             logger.info("=" * 48)
 
-            # Phase: initializing — load external config
-            self._set_phase(PHASE_INITIALIZING)
+            self._set_phase(PHASE_INITIALIZING, engine_status="initializing")
             config_path = os.path.join(self.base_path, CONFIG_FILENAME)
             self.config.load_from_file(config_path)
             self.config.load_from_env()
 
-            # Phase: analyzing hardware
-            self._set_phase(PHASE_ANALYZING_HW)
+            self._set_phase(PHASE_ANALYZING_HW, engine_status="initializing")
             analyze_system_resources(self.config)
 
-            # Phase: loading model — boot engine
-            self._set_phase(PHASE_LOADING_MODEL, engine_status="starting")
+            engine_port = self.config.port + 1
             self.engine = EngineManager(
-                config=self.config,
-                base_path=self.base_path,
+                self.config,
+                self.base_path,
+                engine_port=engine_port,
                 on_crash=self._on_engine_crash,
                 on_status_change=self._on_engine_status_change,
             )
 
-            # Port conflict pre-check (Task 5 hardening)
+            try:
+                self.engine.acquire_instance_lock()
+            except RuntimeError as exc:
+                logger.critical("Singleton lock failed: %s", exc)
+                self._set_phase(PHASE_CRASHED, engine_status="failed", error_message=str(exc))
+                raise SystemExit(1) from exc
+
             self.engine.check_port_available()
 
-            self.engine.boot()
+            self._proxy = CodaiProxyServer(
+                (self.config.host, self.config.port),
+                CodaiProxyHandler,
+                self.config,
+                self.base_path,
+                engine_port=engine_port,
+            )
+            self._set_phase(PHASE_LOADING_MODEL, engine_status="starting")
+            self._proxy_thread = threading.Thread(
+                target=self._proxy.serve_forever,
+                daemon=True,
+                name="codai-proxy",
+            )
+            self._proxy_thread.start()
+            logger.info(
+                "Unified reverse proxy started on %s:%d",
+                self.config.host,
+                self.config.port,
+            )
 
-            # Phase: binding port — wait for ready
+            self.engine.boot()
             self._set_phase(PHASE_BINDING_PORT, engine_status="starting")
             self.engine.wait_for_ready(timeout=90)
-
-            # Phase: ready
+            self.engine.start_health_monitor()
             self._set_phase(PHASE_READY, engine_status="running")
 
-            # Start health monitoring
-            self.engine.start_health_monitor()
-
-            # Launch UI
-            self._launch_ui()
-
-            # Wait for shutdown signal
             self._register_signals()
-            logger.info("")
-            logger.info("=" * 48)
-            logger.info("  Codai Pro is ACTIVE in your browser!")
-            logger.info("  Press Ctrl+C to shut down safely.")
-            logger.info("=" * 48)
-            logger.info("")
-
+            self._launch_ui()
+            self._print_banner()
             self._shutdown_event.wait()
-
         except KeyboardInterrupt:
             logger.info("Keyboard interrupt received.")
+        except SystemExit:
+            raise
         except FileNotFoundError as exc:
             logger.critical("Dependency missing: %s", exc)
+            self._set_phase(PHASE_CRASHED, engine_status="failed", error_message=str(exc))
         except TimeoutError as exc:
             logger.critical("Startup timeout: %s", exc)
+            self._set_phase(PHASE_CRASHED, engine_status="failed", error_message=str(exc))
         except RuntimeError as exc:
             logger.critical("Runtime error: %s", exc)
-        except Exception as exc:
+            self._set_phase(PHASE_CRASHED, engine_status="failed", error_message=str(exc))
+        except Exception as exc:  # pragma: no cover - fatal guard
             logger.critical("Fatal exception: %s", exc, exc_info=True)
+            self._set_phase(PHASE_CRASHED, engine_status="failed", error_message=str(exc))
         finally:
             self._shutdown()
 
     def _shutdown(self) -> None:
-        """Coordinate full system shutdown."""
         self._set_phase(PHASE_SHUTTING_DOWN, engine_status="shutting_down")
         logger.info("Performing full system shutdown...")
+
+        if self._proxy:
+            try:
+                self._proxy.shutdown()
+                self._proxy.server_close()
+            except Exception as exc:
+                logger.warning("Proxy shutdown warning: %s", exc)
+            finally:
+                self._proxy = None
+
         if self.engine:
-            self.engine.shutdown()
-        self._set_phase(PHASE_SHUTTING_DOWN, engine_status="stopped")
-        logger.info("System safely offline. Have a great day!")
+            try:
+                self.engine.shutdown()
+            except Exception as exc:
+                logger.warning("Engine shutdown warning: %s", exc)
+            finally:
+                self.engine = None
 
-    def _on_engine_crash(self, reason: str) -> None:
-        """Callback invoked by EngineManager when auto-restart is exhausted."""
-        logger.critical("Engine unrecoverable: %s", reason)
-        self._shutdown_event.set()
+        logger.info("System safely offline.")
 
 
-# ------------------------------------------------------------------
-# Entry point
-# ------------------------------------------------------------------
 if __name__ == "__main__":
-    app = CodaiController()
-    app.run()
+    try:
+        if sys.platform == "win32":
+            sys.stdout.reconfigure(encoding="utf-8")
+            sys.stderr.reconfigure(encoding="utf-8")
+        CodaiController().run()
+    except SystemExit:
+        raise
+    except Exception as exc:  # pragma: no cover - startup guard
+        crash_log_dir = os.path.join(PROJECT_ROOT, "logs")
+        os.makedirs(crash_log_dir, exist_ok=True)
+        crash_log = os.path.join(crash_log_dir, "crash.log")
+        with open(crash_log, "a", encoding="utf-8") as handle:
+            handle.write(f"FATAL EXCEPTION: {exc}\n")
+        print(f"FATAL EXCEPTION: Check {crash_log}")
+        sys.exit(1)
