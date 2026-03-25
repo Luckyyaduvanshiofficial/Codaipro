@@ -15,6 +15,7 @@ set "SHUTDOWN_URL=http://127.0.0.1:8080/shutdown"
 set "CODAI_PID="
 set "START_MODE="
 set "HAS_PYTHON=0"
+set "IS_REPO=0"
 set "RETRIED_WITH_PYTHON=0"
 set "WAIT_SECONDS=60"
 
@@ -149,6 +150,8 @@ if exist "dev\controller.py" (
     if not errorlevel 1 set "HAS_PYTHON=1"
 )
 
+if exist ".git" set "IS_REPO=1"
+
 if not exist "engine\llama-server.exe" (
     echo   [ERROR] Missing engine binary: engine\llama-server.exe
     exit /b 1
@@ -165,13 +168,19 @@ if not exist "models\%MODEL_NAME%" (
     exit /b 1
 )
 
-if exist ".git" if "%HAS_PYTHON%"=="1" (
+if "%IS_REPO%"=="1" if "%HAS_PYTHON%"=="1" (
     set "START_MODE=python"
-) else if exist "Codai.exe" (
+)
+
+if not defined START_MODE if exist "Codai.exe" (
     set "START_MODE=exe"
-) else if "%HAS_PYTHON%"=="1" (
+)
+
+if not defined START_MODE if "%HAS_PYTHON%"=="1" (
     set "START_MODE=python"
-) else (
+)
+
+if not defined START_MODE (
     echo   [ERROR] Neither a working Python runtime nor Codai.exe is available.
     echo   [ERROR] Install Python or provide a fresh Codai.exe build in the project root.
     exit /b 1
@@ -199,7 +208,7 @@ exit /b 0
 
 :launch_runtime
 if /i "%START_MODE%"=="exe" (
-    echo   [BOOT ] Starting Codai.exe...
+    echo   [BOOT ] Starting packaged runtime: Codai.exe...
     for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "$p = Start-Process -FilePath '%ROOT%Codai.exe' -WorkingDirectory '%ROOT%' -PassThru; $p.Id"`) do set "CODAI_PID=%%A"
 ) else (
     echo   [BOOT ] Running from source via Python...
@@ -212,6 +221,12 @@ if not defined CODAI_PID (
 )
 
 echo   [BOOT ] Process started with PID %CODAI_PID%
+powershell -NoProfile -Command "Start-Sleep -Milliseconds 800; if (Get-Process -Id %CODAI_PID% -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }" >nul 2>nul
+if errorlevel 1 (
+    echo   [ERROR] Runtime process exited immediately after launch.
+    echo   [ERROR] Check logs\codai.log and logs\crash.log for the startup failure.
+    exit /b 1
+)
 exit /b 0
 
 :wait_for_health
