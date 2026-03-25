@@ -1,8 +1,7 @@
-*** Starting compile.  [22:56:56]
+*** Starting compile.  [23:06:19]
 
 Preprocessing
    Reading file: C:\Program Files (x86)\Inno Setup 6\ISPPBuiltins.iss
-Parsing [Setup] section, line 25
 Parsing [Setup] section, line 26
 Parsing [Setup] section, line 27
 Parsing [Setup] section, line 28
@@ -10,22 +9,23 @@ Parsing [Setup] section, line 29
 Parsing [Setup] section, line 30
 Parsing [Setup] section, line 31
 Parsing [Setup] section, line 32
-Parsing [Setup] section, line 35
+Parsing [Setup] section, line 33
 Parsing [Setup] section, line 36
-Parsing [Setup] section, line 39
+Parsing [Setup] section, line 37
 Parsing [Setup] section, line 40
-Parsing [Setup] section, line 43
+Parsing [Setup] section, line 41
 Parsing [Setup] section, line 44
 Parsing [Setup] section, line 45
 Parsing [Setup] section, line 46
-Parsing [Setup] section, line 49
+Parsing [Setup] section, line 47
 Parsing [Setup] section, line 50
 Parsing [Setup] section, line 51
-Parsing [Setup] section, line 54
+Parsing [Setup] section, line 52
 Parsing [Setup] section, line 55
-Parsing [Setup] section, line 58
+Parsing [Setup] section, line 56
 Parsing [Setup] section, line 59
 Parsing [Setup] section, line 60
+Parsing [Setup] section, line 61
 Reading file (LicenseFile)
 Reading file (InfoAfterFile)
 Reading file (WizardImageFile)
@@ -35,41 +35,34 @@ Preparing Setup program executable
    Updating icons (Setup.e32)
    Updating version info (Setup.e32)
 Determining language code pages
-Parsing [Languages] section, line 63
+Parsing [Languages] section, line 64
    Reading file: C:\Program Files (x86)\Inno Setup 6\Default.isl
    Messages in script file
 Reading default messages from Default.isl
-Parsing [Languages] section, line 63
+Parsing [Languages] section, line 64
    Reading file: C:\Program Files (x86)\Inno Setup 6\Default.isl
 Parsing [LangOptions], [Messages], and [CustomMessages] sections
    Messages in script file
 Reading [Code] section
-Parsing [Tasks] section, line 66
-Parsing [Dirs] section, line 113
-Parsing [Dirs] section, line 115
-Parsing [Icons] section, line 118
-Parsing [Icons] section, line 119
-Parsing [Icons] section, line 120
-Parsing [UninstallDelete] section, line 128
-Parsing [UninstallDelete] section, line 129
-Parsing [Run] section, line 124
-Parsing [Files] section, line 70
-Parsing [Files] section, line 73
-Parsing [Files] section, line 76
-Parsing [Files] section, line 77
-Parsing [Files] section, line 78
+Parsing [Tasks] section, line 75
+Parsing [Dirs] section, line 129
+Parsing [Dirs] section, line 131
+Parsing [Icons] section, line 134
+Parsing [Icons] section, line 135
+Parsing [Icons] section, line 136
+Parsing [UninstallDelete] section, line 144
+Parsing [UninstallDelete] section, line 145
+Parsing [Run] section, line 140
 Parsing [Files] section, line 79
-Parsing [Files] section, line 80
-Parsing [Files] section, line 81
 Parsing [Files] section, line 82
 Parsing [Files] section, line 85
+Parsing [Files] section, line 86
+Parsing [Files] section, line 87
 Parsing [Files] section, line 88
+Parsing [Files] section, line 89
+Parsing [Files] section, line 90
 Parsing [Files] section, line 91
-Parsing [Files] section, line 92
-Parsing [Files] section, line 93
 Parsing [Files] section, line 94
-Parsing [Files] section, line 95
-Parsing [Files] section, line 96
 Parsing [Files] section, line 97
 Parsing [Files] section, line 100
 Parsing [Files] section, line 101
@@ -79,7 +72,20 @@ Parsing [Files] section, line 104
 Parsing [Files] section, line 105
 Parsing [Files] section, line 106
 Parsing [Files] section, line 109
-Deleting CodaiPro_Setup_1.0.0.exe from output directory
+Parsing [Files] section, line 110
+Parsing [Files] section, line 111
+Parsing [Files] section, line 112
+Parsing [Files] section, line 113
+Parsing [Files] section, line 114
+Parsing [Files] section, line 115
+Parsing [Files] section, line 116
+Parsing [Files] section, line 117
+Parsing [Files] section, line 118
+Parsing [Files] section, line 119
+Parsing [Files] section, line 120
+Parsing [Files] section, line 121
+Parsing [Files] section, line 122
+Parsing [Files] section, line 125
 Creating setup files
    Verification successful
    Updating icons (Setup.exe)
@@ -142,4 +148,12 @@ Creating setup files
    Compressing: D:\Codai\ui\logo.png
    Compressing: D:\Codai\Documentation.md
    Compressing: D:\Codai\help.txt
+   Compressing: D:\Codai\kill.bat
+   Compressing: D:\Codai\config.json
+   Compressing: D:\Codai\LICENSE
+   Compressing: D:\Codai\readme.md
+   Compressing: D:\Codai\docs\contributor-project-info.md
+   Compressing: D:\Codai\docs\docs_Plan.md
+   Compressing: D:\Codai\docs\prd.md
+   Compressing: D:\Codai\docs\image\architechture-codai.png
 *** Compile aborted.

@@ -115,11 +115,6 @@ Source: "readme.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "docs\contributor-project-info.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 Source: "docs\docs_Plan.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 Source: "docs\prd.md"; DestDir: "{app}\docs"; Flags: ignoreversion
-Source: "docs\image\architechture-codai.png"; DestDir: "{app}\docs\image"; Flags: ignoreversion
-Source: "docs\image\architechture-codai.svg"; DestDir: "{app}\docs\image"; Flags: ignoreversion
-Source: "docs\image\codai.ico"; DestDir: "{app}\docs\image"; Flags: ignoreversion
-Source: "docs\image\Flowchart-codai.png"; DestDir: "{app}\docs\image"; Flags: ignoreversion
-Source: "docs\image\Flowchart-codai.svg"; DestDir: "{app}\docs\image"; Flags: ignoreversion
 
 ; PyInstaller spec (for developers)
 Source: "Codai.spec"; DestDir: "{app}"; Flags: ignoreversion
