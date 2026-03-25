@@ -1,0 +1,30 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller build
+build/
+dist/
+Codai.exe
+*.manifest
+
+# Logs (generated at runtime)
+logs/
+
+# IDE
+.vscode/
+.idea/
+.gemini/
+
+# OS files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Model files (too large for GitHub — distribute via Releases)
+models/*.gguf
+
+# Engine binaries (distribute via Releases)
+engine/*.exe
+engine/*.dll

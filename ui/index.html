@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codai Pro - Fast CPU AI</title>
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Header (Fixed) -->
+        <header class="top-nav">
+            <div class="nav-content">
+                <div class="logo-area">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="url(#gradient)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <defs>
+                            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#10a37f" />
+                                <stop offset="100%" stop-color="#2563eb" />
+                            </linearGradient>
+                        </defs>
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg>
+                    <span class="logo-text">Codai <span class="badge">Pro</span></span>
+                </div>
+                <div class="header-right">
+                    <span class="hardware-badge">100% Offline CPU</span>
+                    <div class="status-indicator-wrapper" title="System Status Indicator">
+                        <div class="status-indicator" id="system-status" role="status" aria-live="polite">
+                            <div class="status-dot"></div>
+                            <span class="status-text" id="status-text-label">CPU Mode Active</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Chat Area (Scrollable) -->
+        <main class="chat-area" id="chat-area" role="log" aria-live="polite" aria-atomic="false">
+            
+            <!-- Empty State -->
+            <div class="empty-state" id="empty-state">
+                <div class="greeting-container fade-in-up">
+                    <h1 class="empty-state-title">What can I help you build?</h1>
+                    <p class="empty-state-desc">Your private, offline AI assistant running securely on your CPU.</p>
+                </div>
+                
+                <div class="suggestions-grid">
+                    <button class="suggestion-card fade-in-up delay-1 ripple" onclick="window.useSuggestion('Write a Python script to scrape a website using BeautifulSoup.')">
+                        <div class="card-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                        </div>
+                        <div class="card-content">
+                            <span class="suggestion-title">Web Scraping</span>
+                            <span class="suggestion-text">Write a Python script with BeautifulSoup</span>
+                        </div>
+                    </button>
+                    
+                    <button class="suggestion-card fade-in-up delay-2 ripple" onclick="window.useSuggestion('Explain how React useEffect works with examples.')">
+                        <div class="card-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10a37f" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </div>
+                        <div class="card-content">
+                            <span class="suggestion-title">Explain Concepts</span>
+                            <span class="suggestion-text">How React useEffect works</span>
+                        </div>
+                    </button>
+                    
+                    <button class="suggestion-card fade-in-up delay-3 ripple" onclick="window.useSuggestion('Help me debug a segmentation fault in my C++ code.')">
+                        <div class="card-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+                        </div>
+                        <div class="card-content">
+                            <span class="suggestion-title">Fix a Bug</span>
+                            <span class="suggestion-text">Debug a C++ segmentation fault</span>
+                        </div>
+                    </button>
+                    
+                    <button class="suggestion-card fade-in-up delay-4 ripple" onclick="window.useSuggestion('Write a SQL query to find the top 5 customers by revenue.')">
+                        <div class="card-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                        </div>
+                        <div class="card-content">
+                            <span class="suggestion-title">Database Query</span>
+                            <span class="suggestion-text">Find top 5 customers by revenue in SQL</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="system-notification" class="system-notification hidden" role="alert" aria-live="assertive"></div>
+            <div id="messages-container"></div>
+        </main>
+
+        <!-- Input Bar (Sticky Bottom) -->
+        <footer class="input-area">
+            <div class="input-wrapper">
+                <div id="char-limit" class="char-limit hidden">
+                    Processing large code input on CPU...
+                </div>
+                <div class="input-box" id="input-box">
+                    <textarea 
+                        id="prompt-input" 
+                        rows="1" 
+                        placeholder="Ask Codai to write, debug, or optimize code..." 
+                        aria-label="Chat input"
+                    ></textarea>
+                    
+                    <div class="input-actions" id="input-actions">
+                        <button id="send-button" disabled aria-label="Send message" class="action-btn send-btn ripple-circle">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="send-icon">
+                                <line x1="12" y1="19" x2="12" y2="5"></line>
+                                <polyline points="5 12 12 5 19 12"></polyline>
+                            </svg>
+                        </button>
+                        <button id="stop-button" aria-label="Stop generation" class="action-btn stop-btn ripple-circle hidden">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="disclaimer fade-in">
+                <span id="system-info-bar" class="system-info-bar">Initializing…</span>
+                <span class="separator">•</span>
+                Runs securely on your CPU hardware
+            </div>
+        </footer>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
