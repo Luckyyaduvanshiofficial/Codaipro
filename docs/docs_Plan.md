@@ -1,76 +1,78 @@
 # Master Execution Plan: Codai Pro
 
-### 1. Project Overview & Target
+## 1. Project Goal
 
-Portable offline AI coding assistant for students on legacy college hardware.
+Codai Pro is a local-first coding assistant for constrained Windows machines. The runtime is intentionally simple:
 
-| Attribute | Specification |
-|-----------|--------------|
-| **Project Name** | Codai Pro |
-| **Execution** | Portable USB Drive (Plug & Play) |
-| **Network** | 100% Offline (No Internet, No APIs) |
-| **Target Hardware** | Pentium/i3, 2–4 GB RAM |
-| **Distribution** | Open Source (GitHub) |
+- a Windows launcher
+- a Python controller
+- a local `llama-server` process
+- a browser UI served through a local proxy
 
-### 2. Architecture Stack
+## 2. Architecture Stack
 
-| Component | Technology | RAM Footprint |
-|-----------|-----------|--------------|
-| **AI Engine** | llama-server.exe (Native C++) | Extremely Low |
-| **Backend** | Python 5-module system (config, system, engine, proxy, controller) | Low |
-| **Frontend** | HTML5 / Vanilla JS + HTTP `/health` polling for periodic health checks | Near Zero |
-| **Styling** | Vanilla CSS (dark theme, developer UX) | Near Zero |
-| **State Sync** | REST for commands + SSE chunking for real-time state/streaming (chat, logs) | Near Zero |
+| Component | Technology | Role |
+|-----------|------------|------|
+| Launcher | `run.bat` | Starts the runtime, waits for readiness, opens the UI |
+| Backend | Python (`config`, `system`, `engine`, `proxy`, `controller`) | Runtime orchestration |
+| Engine | `llama-server.exe` | Local inference |
+| Frontend | HTML / CSS / Vanilla JS | Chat UI and health-driven UX |
+| Cleanup | `kill.bat` | Kills Codai-owned processes and clears stale locks |
 
-### 3. Model Distribution
+## 3. Runtime Flow
 
-| Version | Model (GGUF Q4) | Size | Min RAM |
-|---------|-----------------|------|---------|
-| **Codai Pro** | Gemma-3-1B-IT-Q4_K_M | ~800 MB | 2 GB |
+1. `run.bat` reads `config.json`
+2. launcher chooses Python runtime first when available
+3. `controller.py` loads config and analyzes hardware
+4. proxy starts on the configured port
+5. engine starts on `port + 1`
+6. launcher waits for `/health` to report `phase=ready`
+7. browser opens the UI
 
-### 4. Backend Module Structure
+## 4. Backend Module Structure
 
-| Module | Purpose | Key Features |
-|--------|---------|-------------|
-| `config.py` | Configuration | External config.json + env vars, cross-platform binary detection, constants |
-| `system.py` | Hardware | RAM/CPU detection, CPU-aware threads |
-| `engine.py` | Process | Graceful shutdown, ghostly process locks, auto-restart limits |
-| `proxy.py` | Gateway | HTTP Semaphore Queues, Request TraceIDs, RAM limits, Timeout limits |
-| `controller.py` | Orchestrator | Structured logging (rotation), Singleton PID locks, startup phases |
+| Module | Purpose | Key Notes |
+|--------|---------|-----------|
+| `config.py` | Config + constants | JSON/env overrides, runtime constants |
+| `system.py` | Hardware analysis | RAM/CPU inspection and tuning |
+| `engine.py` | Engine lifecycle | lock file, restart logic, health monitoring |
+| `proxy.py` | HTTP gateway | UI serving, `/health`, chat forwarding, `/shutdown` |
+| `controller.py` | Orchestrator | startup phases, logging, browser launch, shutdown |
 
-### 5. Reliability & Safety
+## 5. Reliability Design
 
-| Feature | Implementation |
-|---------|---------------|
-| Graceful shutdown | terminate → wait(3s) → kill |
-| Auto-restart | 3 attempts with backoff (0s → 2s → 5s) |
-| Health monitor | Process + port check every 5s (daemon thread, thread-safe) |
-| Log rotation | 5 MB × 3 backups (RotatingFileHandler) |
-| Instance lock | PID-based codai_proxy.lock with stale detection |
-| Reverse Proxy | HTTP 429 Backpressure queues, unified 500 error templates |
-| Port conflict | Pre-boot detection with actionable error |
+| Feature | Current Behavior |
+|---------|------------------|
+| Instance lock | `logs/codai.lock` with stale-lock recovery |
+| Health monitoring | engine process and port checks on an interval |
+| Restart policy | restart on crash with bounded retries |
+| Log rotation | `codai.log` rotates through backup files |
+| Crash reporting | `logs/crash.log` stores fatal tracebacks |
+| Graceful shutdown | launcher calls local `/shutdown`, controller tears down proxy and engine |
 
-### 6. Frontend Integration
+## 6. Frontend Integration
 
-| Feature | Implementation |
-|---------|---------------|
-| State sync | SystemBridge polls proxy `/health` every 2s |
-|             | **SystemBridge:** a frontend service/component that polls the proxy `/health` endpoint every 2s to synchronize system state with the UI. See also: Frontend Architecture section. |
-| Status mapping | Engine status → human-readable messages in header |
-| Crash UX | Strict JSON parsing + interrupted connection traps |
-| Restart UX | Amber spinner notification |
-| System info | Footer: "model • threads • ctx" |
-| Streaming | Token-by-token with 35ms batch rendering + cursor |
+| Feature | Current Behavior |
+|---------|------------------|
+| State sync | `SystemBridge` polls `/health` |
+| Chat | UI sends `POST /v1/chat/completions` to the proxy |
+| Status UX | UI derives state from `phase`, `engine`, and `engine_display` |
+| Failure visibility | frontend errors are forwarded to `/frontend-error` |
+| Telemetry | `/telemetry` serves the local logs page |
 
-### 7. Development Roadmap
+## 7. Current Working Assumptions
 
-| Phase | Component | Status |
-|-------|-----------|--------|
-| Phase 1 | Python backend (4 modular files) | ✅ Complete |
-| Phase 2 | Chat UI (streaming, stop, markdown, code actions) | ✅ Complete |
-| Phase 3 | Engine binaries + model download | ✅ Complete |
-| Phase 4 | Production hardening (12 improvements) | ✅ Complete |
-| Phase 5 | Frontend-backend integration (14 improvements) | ✅ Complete |
-| Phase 6 | Documentation & scripts | ✅ Complete |
-| Phase 7 | PyInstaller build + USB packaging | Pending |
-| Phase 8 | Legacy hardware testing (2GB/4GB) | Pending |
+- Main platform is Windows.
+- Local browser access is expected.
+- Source runtime is the most trustworthy path during development.
+- `Codai.exe` is optional convenience packaging, not the primary development loop.
+
+## 8. Ongoing Priorities
+
+| Priority | Focus |
+|----------|-------|
+| P1 | Keep launcher, controller, and proxy behavior aligned |
+| P1 | Preserve clear logs and startup diagnostics |
+| P2 | Keep docs accurate when ports, locks, or process flow change |
+| P2 | Maintain clean local shutdown and stale-lock recovery |
+| P3 | Improve packaging reliability for `Codai.exe` |

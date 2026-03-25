@@ -17,6 +17,9 @@ const State = {
     startupPhase: "initializing",
     lastRequestId: null,
     backendPort: 8080,
+    conversation: [],
+    maxHistoryMessages: 4,
+    maxHistoryChars: 1200,
     get backendUrl() {
         return window.location.protocol === "file:" ? `http://127.0.0.1:${this.backendPort}` : window.location.origin;
     },
@@ -66,6 +69,46 @@ function extractAssistantText(payload) {
     );
 }
 
+function extractStreamText(payload) {
+    const choice = payload?.choices?.[0];
+    return (
+        choice?.delta?.content
+        || choice?.message?.content
+        || choice?.text
+        || choice?.content
+        || payload?.output_text
+        || ""
+    );
+}
+
+function rememberTurn(role, content) {
+    if (!content) return;
+    State.conversation.push({ role, content: String(content) });
+    if (State.conversation.length > State.maxHistoryMessages) {
+        State.conversation = State.conversation.slice(-State.maxHistoryMessages);
+    }
+}
+
+function buildMessageHistory(promptText) {
+    const history = [];
+    let charCount = promptText.length + State.systemPrompt.length;
+
+    for (let i = State.conversation.length - 1; i >= 0; i--) {
+        const turn = State.conversation[i];
+        const turnLength = turn.content.length;
+        if (history.length >= State.maxHistoryMessages) break;
+        if (charCount + turnLength > State.maxHistoryChars) break;
+        history.unshift(turn);
+        charCount += turnLength;
+    }
+
+    return [
+        { role: "system", content: State.systemPrompt },
+        ...history,
+        { role: "user", content: promptText }
+    ];
+}
+
 function forwardFrontendError(kind, details) {
     const signature = `${kind}:${details.message || "unknown"}:${details.stack || ""}`;
     const now = Date.now();
@@ -94,7 +137,7 @@ const SESSION_LOCK_ID = "codai_tab_" + Date.now() + "_" + Math.floor(Math.random
 State.lockTimer = setInterval(() => {
     const time = parseInt(localStorage.getItem('codai_tab_time') || "0");
     const active = localStorage.getItem('codai_active_tab');
-    if (!active || active === SESSION_LOCK_ID || (Date.now() - time) > 3000) {
+    if (!active || active === SESSION_LOCK_ID || (Date.now() - time) > 7000) {
         localStorage.setItem('codai_active_tab', SESSION_LOCK_ID);
         localStorage.setItem('codai_tab_time', Date.now().toString());
         const m = document.getElementById("tab-lock-modal");
@@ -108,7 +151,7 @@ State.lockTimer = setInterval(() => {
             document.body.appendChild(m);
         }
     }
-}, 1000);
+}, 2500);
 
 // Global Error Catching
 window.onerror = function(message, source, lineno, colno, error) {
@@ -162,7 +205,7 @@ const SystemBridge = {
     _pollTimer: null,
     _consecutiveErrors: 0,
     _maxErrors: 10,
-    _pollInterval: 4000,
+    _pollInterval: 6000,
 
     els: {
         notification: null,
@@ -224,7 +267,10 @@ const SystemBridge = {
 
             if (this.els.infoBar) {
                 const queueSuffix = data.queue ? ` • Queue: ${data.queue}` : '';
-                this.els.infoBar.innerText = `${PHASE_MAP[data.phase] || 'System active'} • Uptime: ${data.uptime || 'n/a'}${queueSuffix}`;
+                const nextInfo = `${PHASE_MAP[data.phase] || 'System active'} • Uptime: ${data.uptime || 'n/a'}${queueSuffix}`;
+                if (this.els.infoBar.innerText !== nextInfo) {
+                    this.els.infoBar.innerText = nextInfo;
+                }
             }
 
             if (data.engine === 'running') {
@@ -486,7 +532,7 @@ const UI = {
 
     scrollBottom() {
         if (!State.userIsReading) {
-            this.els.chatArea.scrollTo({ top: this.els.chatArea.scrollHeight, behavior: 'smooth' });
+            this.els.chatArea.scrollTop = this.els.chatArea.scrollHeight;
         }
     }
 };
@@ -506,11 +552,14 @@ const API = {
         UI.appendUser(promptText);
 
         UI.toggleIOState(true);
+        UI.updateStatus("Generating...", "streaming");
 
         State.abortController = new AbortController();
         const startTime = performance.now();
         let finalBubbleReference = null;
         const completionBudget = promptText.length <= 20 ? 128 : promptText.length <= 120 ? 160 : 224;
+        const requestMessages = buildMessageHistory(promptText);
+        let streamedText = "";
 
         try {
             const response = await fetch(`${State.backendUrl}/v1/chat/completions`, {
@@ -518,22 +567,19 @@ const API = {
                 headers: { 'Content-Type': 'application/json' },
                 signal: State.abortController.signal,
                 body: JSON.stringify({
-                    messages: [
-                        { role: "system", content: State.systemPrompt },
-                        { role: "user", content: promptText }
-                    ],
+                    messages: requestMessages,
                     temperature: 0.1,
                     max_tokens: completionBudget,
-                    stream: false
+                    stream: true
                 })
             });
 
-            const envelope = await readEnvelope(response);
-            const errText = extractErrorMessage(
-                envelope,
-                `Backend not reachable (HTTP ${response.status})`
-            );
-            if (!response.ok || envelope.status !== "ok") {
+            if (!response.ok) {
+                const envelope = await readEnvelope(response);
+                const errText = extractErrorMessage(
+                    envelope,
+                    `Backend not reachable (HTTP ${response.status})`
+                );
                 UI.showSystemMessage(errText, 'error');
                 UI.renderError(errText, promptText);
                 return;
@@ -541,11 +587,14 @@ const API = {
 
             const { bubble: answerBubble } = UI.createBubble(false);
             finalBubbleReference = answerBubble;
-            const aiCompleteText = extractAssistantText(envelope.data).trim();
+            streamedText = await this.consumeStream(response, answerBubble);
+            const aiCompleteText = streamedText.trim();
             if (!aiCompleteText) {
                 throw new Error("Model returned malformed or empty output.");
             }
 
+            rememberTurn("user", promptText);
+            rememberTurn("assistant", aiCompleteText);
             this.finalizeResponse(aiCompleteText, startTime, finalBubbleReference, false);
         } catch (err) {
             UI.clearTimers();
@@ -588,6 +637,94 @@ const API = {
         UI.updateStatus("Stopped", "default");
     },
 
+    async consumeStream(response, bubbleElem) {
+        const reader = response.body?.getReader();
+        if (!reader) {
+            throw new Error("Streaming response body is unavailable.");
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let fullText = "";
+        let completeReceived = false;
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            let boundaryIndex = buffer.indexOf("\n\n");
+            while (boundaryIndex !== -1) {
+                const rawEvent = buffer.slice(0, boundaryIndex);
+                buffer = buffer.slice(boundaryIndex + 2);
+                this.processStreamEvent(rawEvent, bubbleElem, {
+                    append: chunk => {
+                        if (!chunk) return;
+                        fullText += chunk;
+                        bubbleElem.textContent = fullText;
+                        bubbleElem.style.whiteSpace = "pre-wrap";
+                        UI.scrollBottom();
+                    },
+                    markComplete: () => {
+                        completeReceived = true;
+                    }
+                });
+                boundaryIndex = buffer.indexOf("\n\n");
+            }
+        }
+
+        buffer += decoder.decode();
+        if (buffer.trim()) {
+            this.processStreamEvent(buffer.trim(), bubbleElem, {
+                append: chunk => {
+                    if (!chunk) return;
+                    fullText += chunk;
+                    bubbleElem.textContent = fullText;
+                    bubbleElem.style.whiteSpace = "pre-wrap";
+                    UI.scrollBottom();
+                },
+                markComplete: () => {
+                    completeReceived = true;
+                }
+            });
+        }
+
+        if (!completeReceived && !fullText.trim()) {
+            throw new Error("Stream ended without returning any text.");
+        }
+
+        return fullText;
+    },
+
+    processStreamEvent(rawEvent, bubbleElem, handlers) {
+        const dataLines = rawEvent
+            .split("\n")
+            .filter(line => line.startsWith("data:"))
+            .map(line => line.slice(5).trim());
+
+        if (dataLines.length === 0) return;
+
+        const payloadText = dataLines.join("\n");
+        let envelope;
+        try {
+            envelope = JSON.parse(payloadText);
+        } catch {
+            return;
+        }
+
+        if (envelope.status === "complete") {
+            handlers.markComplete();
+            return;
+        }
+
+        if (envelope.status !== "streaming") {
+            return;
+        }
+
+        const chunk = extractStreamText(envelope.data);
+        handlers.append(chunk);
+    },
+
     finalizeResponse(text, startTime, bubbleElem, wasAborted) {
         if (!text) return;
         
@@ -603,24 +740,13 @@ const API = {
             bubbleElem.style.whiteSpace = "pre-wrap";
         }
         
-        // Construction of meta-footer
         const meta = document.createElement('div');
         meta.className = `ai-meta-footer ${wasAborted ? 'stopped' : ''}`;
-        
-        if (wasAborted) {
-            meta.innerHTML = `<svg viewBox="0 0 24 24" fill="none" class="meta-icon" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"></rect></svg> <span style="font-weight: 500;">⏹ Generation stopped by user</span>`;
-        } else {
-            const perfTier = timeSecs < 3.0 ? "Fast" : "Slow (CPU)";
-            meta.innerHTML = `<svg viewBox="0 0 24 24" fill="none" class="meta-icon" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Local CPU • ${timeSecs}s (${perfTier})`;
-        }
 
-        // Feature: Copy All Code
-        if (text.includes('```')) {
-            const multiCopyBtn = document.createElement('button');
-            multiCopyBtn.className = "copy-all-btn ripple";
-            multiCopyBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy All Code`;
-            multiCopyBtn.onclick = () => Markdown.copyAllCode(bubbleElem, multiCopyBtn);
-            meta.appendChild(multiCopyBtn);
+        if (wasAborted) {
+            meta.textContent = "Generation stopped by user";
+        } else {
+            meta.textContent = `Local CPU • ${timeSecs}s`;
         }
 
         bubbleElem.appendChild(meta);
@@ -692,12 +818,6 @@ const Markdown = {
                 <div class="code-header">
                     <span>${lang.toUpperCase()}</span>
                     <div class="code-actions">
-                        <button class="code-btn ripple" onclick="window.explainCode(this)" title="Explain code">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Explain
-                        </button>
-                        <button class="code-btn ripple" onclick="window.optimizeCode(this)" title="Optimize code">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Optimize
-                        </button>
                         <button class="code-btn ripple" onclick="window.copySnippet('${encodedCode}', this)" title="Copy">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy
                         </button>
@@ -722,18 +842,7 @@ const Markdown = {
         return text.replace(/\r\n/g, '\n').trim();
     },
 
-    copyAllCode(bubbleElem, btn) {
-        const blocks = Array.from(bubbleElem.querySelectorAll('pre code'));
-        if (blocks.length === 0) return;
-        
-        const combinedString = blocks.map((b, i) => `// --- Block ${i+1} ---\n${b.innerText.trim()}`).join('\n\n');
-        
-        navigator.clipboard.writeText(combinedString).then(() => {
-            const originalHtml = btn.innerHTML;
-            btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12" stroke="#10a37f" stroke-width="2.5"></polyline></svg> Copied All!`;
-            setTimeout(() => { btn.innerHTML = originalHtml; }, 2000);
-        });
-    }
+    copyAllCode() {}
 };
 
 // ----------------------------------------------------
@@ -754,16 +863,6 @@ window.copySnippet = (encodedCode, btn) => {
         btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12" stroke="#10a37f" stroke-width="2.5"></polyline></svg> <span style="color:#10a37f">Copied</span>`;
         setTimeout(() => { btn.innerHTML = oh; }, 2000);
     });
-};
-
-window.explainCode = (btn) => {
-    const codeText = btn.parentElement.parentElement.nextElementSibling.innerText.trim();
-    window.useSuggestion("Please explain this code snippet in detail:\n\n```\n" + codeText + "\n```");
-};
-
-window.optimizeCode = (btn) => {
-    const codeText = btn.parentElement.parentElement.nextElementSibling.innerText.trim();
-    window.useSuggestion("Please optimize this code for performance and explain your changes:\n\n```\n" + codeText + "\n```");
 };
 
 // Application Boot

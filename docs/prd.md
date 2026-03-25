@@ -1,88 +1,90 @@
-# Codai Pro — Product Requirements Document
+# Codai Pro - Product Requirements Document
 
 ## Vision
 
-A portable, offline AI coding assistant that runs on legacy college hardware (2–4 GB RAM, Pentium/i3 CPUs) from a USB drive with zero internet dependency.
+Build a practical offline coding assistant that can run on ordinary Windows machines without depending on cloud APIs or a heavy desktop app shell.
 
-## Target Users
+## Primary Users
 
-MCA and engineering students on locked-down lab computers with limited RAM and no internet access.
+- students on limited hardware
+- developers who want a local-first coding assistant
+- contributors who need a small, understandable runtime instead of a large framework stack
 
-## System Requirements
+## Product Shape
 
-| Requirement | Minimum | Recommended |
-|-------------|---------|-------------|
-| OS | Windows 10+ | Windows 10/11 |
-| CPU | Pentium / i3 | i3+ |
-| RAM | 2 GB | 4 GB |
-| Disk | 1.5 GB free | 2 GB free |
-| Network | None | None |
-| Browser | Chrome / Edge | Chrome |
+| Area | Decision |
+|------|----------|
+| Runtime model | Local `llama-server` inference |
+| OS focus | Windows first |
+| UI delivery | Browser-based local UI |
+| Control plane | Python runtime orchestration |
+| Startup UX | `run.bat` launcher with readiness checks |
+
+## Core Requirements
+
+### Runtime
+
+- must start locally from the project folder
+- must serve the UI through a local HTTP endpoint
+- must expose health state to the UI
+- must shut down cleanly and release its lock file
+
+### Reliability
+
+- detect duplicate instances
+- recover stale locks
+- restart the engine after crashes when possible
+- write actionable logs for startup and runtime failures
+
+### Contributor Experience
+
+- architecture should stay understandable without a large framework
+- startup and shutdown flow should be traceable in logs
+- major runtime behavior should be documented in repo docs
 
 ## Architecture
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| AI Engine | llama-server.exe (C++) | Local inference |
-| Backend | Python (4 modules) | Process management, hardware detection, logging |
-| Frontend | HTML5 / Vanilla JS / CSS | Chat UI, streaming, status sync |
-| Model | Gemma 3 1B IT Q4_K_M (GGUF) | 800 MB, optimized for low RAM |
-| Build | PyInstaller | Portable single exe |
+| Component | Technology | Responsibility |
+|-----------|------------|----------------|
+| Launcher | Batch script | start, readiness wait, browser open, stop flow |
+| Controller | Python | orchestrate system, proxy, engine, and shutdown |
+| Proxy | Python HTTP server | serve UI, expose health, forward chat requests |
+| Engine | `llama-server.exe` | text generation |
+| Frontend | HTML/CSS/JS | chat UX, polling, status updates |
 
-## Backend Modules
+## Important Endpoints
 
-| Module | Responsibility |
-|--------|---------------|
-| `config.py` | Constants, external config (JSON + env), path resolution, cross-platform |
-| `system.py` | RAM/CPU detection, tier allocation, system_info.json (atomic writes) |
-| `engine.py` | Process boot/shutdown, health monitor, auto-restart, instance lock |
-| `controller.py` | Orchestrator, structured logging (rotation), signal handling, UI launch |
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /` | UI |
+| `GET /health` | runtime readiness and engine state |
+| `POST /v1/chat/completions` | chat request path |
+| `POST /frontend-error` | browser-side error reporting |
+| `POST /shutdown` | graceful local shutdown |
+| `GET /telemetry` | local telemetry/logs page |
 
-## Frontend Integration
+## Operating Model
 
-| Feature | Implementation |
-|---------|---------------|
-| State sync | `SystemBridge` polls `system_info.json` every 2s |
-| Status display | Header indicator maps engine status to human-readable text |
-| Crash handling | Notification banner + input disabled + auto-recovery |
-| System info | Footer bar: model • threads • ctx |
-| Streaming | Token-by-token with 35ms batch rendering |
-| Stop | AbortController with partial response preservation |
+- configured port hosts the UI and proxy
+- engine runs on `configured port + 1`
+- launcher waits for `/health` to report `ready`
+- UI polls `/health` to keep its state in sync
 
-## Reliability Features
+## Non-Goals
 
-| Feature | Mechanism |
-|---------|-----------|
-| Graceful shutdown | terminate → wait(3s) → kill |
-| Auto-restart | Up to 3 attempts with backoff (0s → 2s → 5s) |
-| Health monitoring | Process poll + port check every 5s |
-| Log rotation | 5 MB × 3 backups |
-| Instance lock | PID-based lock file |
-| Atomic state | temp file → os.replace |
-| Port conflict | Pre-boot detection with actionable error |
+- no dependency on hosted inference for normal usage
+- no complex backend framework
+- no hidden multi-service deployment story
 
-## Anti-Hallucination Protocols
+## Current Risks
 
-| Protocol | Setting | Purpose |
-|----------|---------|---------|
-| Temperature | 0.1 | Forces deterministic output |
-| Context limit | 512–2048 (auto) | Prevents memory exhaustion |
-| System prompt | Hidden directive | "Say I don't know instead of guessing" |
+- packaged `Codai.exe` can drift from the source runtime
+- port-related behavior becomes confusing if docs are not kept current
+- local process handling on Windows is easy to get wrong without explicit ownership checks
 
-## Configuration Priority
+## Success Criteria
 
-1. Environment variables (`CODAI_*`)
-2. `config.json` in project root
-3. Auto-detected hardware defaults
-
-## Development Roadmap
-
-| Phase | Component | Status |
-|-------|-----------|--------|
-| Phase 1 | Modular Python backend (4 modules) | ✅ Complete |
-| Phase 2 | Chat UI with streaming + status sync | ✅ Complete |
-| Phase 3 | Engine binaries + model distribution | ✅ Complete |
-| Phase 4 | Production hardening (all 12 items) | ✅ Complete |
-| Phase 5 | Frontend-backend integration (14 items) | ✅ Complete |
-| Phase 6 | PyInstaller build + USB packaging | Pending |
-| Phase 7 | Legacy hardware testing (2GB/4GB) | Pending |
+- `run.bat` starts the UI reliably
+- the UI can complete a chat request through the proxy
+- `kill.bat` only targets Codai-owned processes
+- contributors can understand the runtime by reading the docs and a few core files

@@ -81,6 +81,9 @@ class CodaiProxyHandler(http.server.BaseHTTPRequestHandler):
             if clean_path == "/frontend-error":
                 self._handle_frontend_error()
                 return
+            if clean_path == "/shutdown":
+                self._handle_shutdown()
+                return
 
             self._proxy_request("POST")
         except Exception as exc:  # pragma: no cover - final guard
@@ -274,6 +277,33 @@ class CodaiProxyHandler(http.server.BaseHTTPRequestHandler):
                 "phase": getattr(self.server, "startup_phase", "initializing"),
             },
         )
+
+    def _handle_shutdown(self) -> None:
+        client_host = self.client_address[0]
+        if client_host not in {"127.0.0.1", "::1"}:
+            self._send_error_response(
+                403,
+                "shutdown_forbidden",
+                "Shutdown is only available from the local machine.",
+            )
+            return
+
+        callback = getattr(self.server, "shutdown_callback", None)
+        if callback is None:
+            self._send_error_response(
+                503,
+                "shutdown_unavailable",
+                "Runtime shutdown callback is not configured.",
+            )
+            return
+
+        logger.info("Shutdown requested via local HTTP endpoint.")
+        self._send_json_response(
+            202,
+            "accepted",
+            data={"message": "Shutdown requested."},
+        )
+        threading.Thread(target=callback, daemon=True, name="proxy-shutdown").start()
 
     def _handle_logs(self) -> None:
         if not getattr(self.server.config, "debug", False):
@@ -619,11 +649,13 @@ class CodaiProxyServer(http.server.ThreadingHTTPServer):
         config: Any,
         base_path: str,
         engine_port: int = 8081,
+        shutdown_callback: Any = None,
     ) -> None:
         super().__init__(server_address, request_handler_class)
         self.config = config
         self.base_path = base_path
         self.engine_port = engine_port
+        self.shutdown_callback = shutdown_callback
         self.engine_status = "initializing"
         self.startup_phase = "initializing"
         self.error_message = ""
