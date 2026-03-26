@@ -24,6 +24,11 @@ logger = logging.getLogger("codai.proxy")
 
 MAX_BODY_SIZE = 1024 * 1024  # 1 MB hard cap
 STREAM_ENDPOINTS = {"/v1/chat/completions"}
+CLIENT_DISCONNECT_ERRORS = (
+    BrokenPipeError,
+    ConnectionAbortedError,
+    ConnectionResetError,
+)
 
 
 class CodaiProxyHandler(http.server.BaseHTTPRequestHandler):
@@ -66,6 +71,8 @@ class CodaiProxyHandler(http.server.BaseHTTPRequestHandler):
                     return
 
             self._proxy_request("GET")
+        except CLIENT_DISCONNECT_ERRORS as exc:
+            logger.info("Client disconnected during GET %s: %s", self.path, exc)
         except Exception as exc:  # pragma: no cover - final guard
             logger.exception("Unhandled GET failure: %s", exc)
             self._send_error_response(
@@ -86,6 +93,8 @@ class CodaiProxyHandler(http.server.BaseHTTPRequestHandler):
                 return
 
             self._proxy_request("POST")
+        except CLIENT_DISCONNECT_ERRORS as exc:
+            logger.info("Client disconnected during POST %s: %s", self.path, exc)
         except Exception as exc:  # pragma: no cover - final guard
             logger.exception("Unhandled POST failure: %s", exc)
             self._send_error_response(
@@ -128,19 +137,23 @@ class CodaiProxyHandler(http.server.BaseHTTPRequestHandler):
         payload = self._build_payload(status=status, data=data, error=error)
         body = json.dumps(payload).encode("utf-8")
 
-        self.send_response(status_code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Connection", "close")
-        self.send_header("X-Request-Id", self.current_req_id)
-        if extra_headers:
-            for key, value in extra_headers.items():
-                self.send_header(key, value)
-        self._send_cors_headers()
-        self.close_connection = True
-        self.end_headers()
-        self.wfile.write(body)
-        self.wfile.flush()
+        try:
+            self.send_response(status_code)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
+            self.send_header("X-Request-Id", self.current_req_id)
+            if extra_headers:
+                for key, value in extra_headers.items():
+                    self.send_header(key, value)
+            self._send_cors_headers()
+            self.close_connection = True
+            self.end_headers()
+            self.wfile.write(body)
+            self.wfile.flush()
+        except CLIENT_DISCONNECT_ERRORS:
+            self.close_connection = True
+            raise
 
     def _send_error_response(
         self,
@@ -169,8 +182,12 @@ class CodaiProxyHandler(http.server.BaseHTTPRequestHandler):
     ) -> None:
         chunk = self._build_payload(status=status, data=data, error=error)
         encoded = f"data: {json.dumps(chunk)}\n\n".encode("utf-8")
-        self.wfile.write(encoded)
-        self.wfile.flush()
+        try:
+            self.wfile.write(encoded)
+            self.wfile.flush()
+        except CLIENT_DISCONNECT_ERRORS:
+            self.close_connection = True
+            raise
 
     def _get_queue_status(self) -> str:
         semaphore = getattr(self.server, "_queue_semaphore", None)
@@ -512,14 +529,18 @@ class CodaiProxyHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.flush()
 
     def _stream_upstream_response(self, response: Any) -> None:
-        self.send_response(response.status)
-        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
-        self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "close")
-        self.send_header("X-Request-Id", self.current_req_id)
-        self.close_connection = True
-        self._send_cors_headers()
-        self.end_headers()
+        try:
+            self.send_response(response.status)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "close")
+            self.send_header("X-Request-Id", self.current_req_id)
+            self.close_connection = True
+            self._send_cors_headers()
+            self.end_headers()
+        except CLIENT_DISCONNECT_ERRORS:
+            self.close_connection = True
+            raise
 
         chunk_count = 0
         saw_payload = False
