@@ -58,6 +58,20 @@ first startup takes as long as the download.
 Leave the launcher window open while you work. Press any key in it to stop
 Codai cleanly. `kill.bat` force-stops everything if a launch ever goes wrong.
 
+### Option 2b: Offline portable USB (no internet at all)
+
+Use this when the lab PC has no internet connection and you want the model on
+the pendrive:
+
+```text
+1. Download CodaiPro-3.1.0-Portable-Offline-Windows.zip.
+2. Extract the zip directly to a writable folder on the USB drive.
+3. Double-click run.bat on any Windows PC.
+```
+
+The offline zip includes the default model, the llama.cpp engine, and the MSVC
+runtime. Nothing is installed on the PC, and no network connection is used.
+
 ---
 
 ## Option 3: From source

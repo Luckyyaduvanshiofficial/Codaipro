@@ -28,6 +28,8 @@ model so installing is a single step.
 - Tray icon with hide-to-tray on close and a clean quit path.
 - One-click Windows installer: a single extraction/progress screen, then the
   app launches automatically.
+- Offline portable USB zip: extract to a pendrive and run `run.bat`. Includes
+  the model, engine, and runtime; no install and no internet are needed.
 - Conversation history stored locally and restored on launch.
 - Splash screen that reports real startup phases, including model load.
 - The chat window opens only after the model can actually answer requests.

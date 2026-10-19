@@ -61,6 +61,10 @@ Both packages include `Codai.exe` and the official `engine\llama-server.exe`. Th
 installer also bundles the default model. If a model is missing, the first run
 downloads it; you can also drop any `.gguf` into `models/` yourself.
 
+**Fully offline USB:** download `CodaiPro-3.1.0-Portable-Offline-Windows.zip`,
+extract it to the pendrive, and double-click `run.bat`. The model, engine, and
+MSVC runtime are included, so it needs no installation and no internet.
+
 Full instructions and troubleshooting: [INSTALLATION.md](INSTALLATION.md).
 
 ## 🐍 Run from Source (Windows / Linux / macOS)

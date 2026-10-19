@@ -121,6 +121,55 @@ jobs:
         name: CodaiPro-Windows-Portable
         path: CodaiPro-${{ env.VERSION }}-Portable-Windows.zip
 
+    - name: Assemble offline portable package
+      id: offline
+      shell: pwsh
+      run: |
+        $versionNumber = "${{ env.VERSION }}".TrimStart('v')
+        $dest = "portable-offline\CodaiPro"
+        Remove-Item "portable-offline" -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force -Path $dest | Out-Null
+        Copy-Item -Recurse -Force "portable\CodaiPro\*" $dest
+        Copy-Item "models\*.gguf" "$dest\models\" -Force
+
+        $portableReadme = @(
+          'Codai Pro - Offline Portable (USB)',
+          '==================================',
+          '',
+          '1. Extract this zip to a writable folder on your USB drive.',
+          '2. Double-click run.bat.',
+          '3. Wait for [READY]. Your browser opens the local chat UI.',
+          '',
+          'No installation and no internet connection are required.',
+          'The default model, llama.cpp engine, and MSVC runtime are included.',
+          '',
+          'Keep the folder writable: logs and runtime files are written next to the app.',
+          'To stop Codai, press any key in the launcher window.',
+          'Emergency cleanup: run kill.bat.'
+        ) -join "`r`n"
+        Set-Content -Path "$dest\README-PORTABLE.txt" -Value $portableReadme -Encoding UTF8
+
+        $modelReadme = @(
+          'This offline portable package includes the default model:',
+          '',
+          '  Qwen_Qwen3.5-0.8B-Q4_K_M.gguf',
+          '',
+          'No download is needed. To use another model, put its .gguf file here and set',
+          '"model_name" in config.json to that filename.'
+        ) -join "`r`n"
+        Set-Content -Path "$dest\models\README.txt" -Value $modelReadme -Encoding UTF8
+
+        $zip = "CodaiPro-$versionNumber-Portable-Offline-Windows.zip"
+        Compress-Archive -Path "portable-offline\CodaiPro\*" -DestinationPath $zip
+        "zip=$zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        Get-Item $zip | Select-Object Name, Length
+
+    - name: Upload offline portable artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CodaiPro-Windows-Portable-Offline
+        path: ${{ steps.offline.outputs.zip }}
+
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
@@ -171,6 +220,12 @@ jobs:
         name: CodaiPro-Windows-Portable
         path: release-assets
 
+    - name: Download offline portable artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: CodaiPro-Windows-Portable-Offline
+        path: release-assets
+
     - name: Download installer artifact
       uses: actions/download-artifact@v4
       with:
@@ -201,18 +256,19 @@ jobs:
           - **Reliability**: the engine restarts after a crash instead of stalling, config errors are reported clearly, and the instance lock handles PID reuse
           - **Cleanup**: removed the legacy Inno Setup script, v3.0-era docs, the duplicate PRD case variant, and unused assets
 
-          **Direct downloads:** [Windows installer](https://github.com/Luckyyaduvanshiofficial/Codaipro/releases/latest/download/CodaiPro_Setup_${{ steps.version.outputs.number }}.exe) · [Portable zip](https://github.com/Luckyyaduvanshiofficial/Codaipro/releases/latest/download/CodaiPro-${{ env.VERSION }}-Portable-Windows.zip)
+          **Direct downloads:** [Windows installer](https://github.com/Luckyyaduvanshiofficial/Codaipro/releases/latest/download/CodaiPro_Setup_${{ steps.version.outputs.number }}.exe) · [Portable zip](https://github.com/Luckyyaduvanshiofficial/Codaipro/releases/latest/download/CodaiPro-${{ env.VERSION }}-Portable-Windows.zip) · [Offline portable zip](https://github.com/Luckyyaduvanshiofficial/Codaipro/releases/latest/download/CodaiPro-${{ steps.version.outputs.number }}-Portable-Offline-Windows.zip)
 
-          ### Two downloads
+          ### Three downloads
 
           | File | What it is |
           |---|---|
           | `CodaiPro_Setup_*.exe` | **Installer (recommended).** One-click: extracts, installs, and launches. Start menu and desktop shortcuts, uninstaller, includes the default model, chats saved in `%APPDATA%`. |
           | `CodaiPro-*-Portable-Windows.zip` | **Portable.** Unzip to a writable folder or USB stick and run `run.bat`. Opens in your browser; downloads the model on first run. |
+          | `CodaiPro-*-Portable-Offline-Windows.zip` | **Portable offline (USB).** Extract to a pendrive and run `run.bat`. Includes the default model, engine, and runtime; no install and no internet are needed. |
 
           ### First run
           1. Install and launch Codai Pro.
-          2. Wait while the bundled model loads. The portable zip downloads the model once instead.
+          2. Wait while the bundled model loads. The portable zip downloads the model once instead; the offline portable zip includes it.
           3. Chat. After this, everything runs offline.
 
           ### Notes
@@ -230,4 +286,5 @@ jobs:
         prerelease: false
         files: |
           release-assets/CodaiPro-${{ env.VERSION }}-Portable-Windows.zip
+          release-assets/CodaiPro-${{ steps.version.outputs.number }}-Portable-Offline-Windows.zip
           release-assets/CodaiPro_Setup_*.exe
