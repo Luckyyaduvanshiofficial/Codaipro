@@ -40,6 +40,10 @@ build/
 dist/
 dist_portable/
 
+# Local assistant/tooling state (not part of the project)
+.claude/
+.commandcode/
+
 # IDE
 .vscode/
 .idea/
