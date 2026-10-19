@@ -47,7 +47,7 @@ This PRD covers a native Windows desktop app with a ChatGPT-style interface. The
 
 **Installation and first run**
 - As a new user, I install the app from one `.exe` setup file and get Start menu and desktop shortcuts.
-- As a new user, on first launch I see a setup screen that downloads or verifies the model, with progress and a retry option.
+- As a new user, on first launch I see the model load from the installer, with progress and a retry option if something is missing.
 - As a user, I can see that the model is ready before I start chatting.
 
 **Chatting**
@@ -133,7 +133,7 @@ This PRD covers a native Windows desktop app with a ChatGPT-style interface. The
 | ID | Requirement | Priority |
 |---|---|---|
 | FR-M1 | Detect models in the models folder and list them in settings | P0 |
-| FR-M2 | First-run setup downloads the default model with progress, pause, resume, and checksum verification | P0 |
+| FR-M2 | The installer includes the default model; if it is missing and `model_url` is set, the runtime downloads it with progress, resume, and size verification | P0 |
 | FR-M3 | Show a clear error when no model is installed, with a button to open the setup screen | P0 |
 | FR-M4 | Let users import a `.gguf` file from disk | P1 |
 | FR-M5 | Show model name, size, and quantization in the picker | P1 |
@@ -198,7 +198,7 @@ Run `build-windows.ps1` on Windows from the repository root. It performs all thr
 2. Runs PyInstaller against `Codai.spec` to produce `dist/Codai.exe`.
 3. Runs electron-builder in `desktop/` to produce the NSIS installer in `build/desktop/`.
 
-The installer bundles `Codai.exe`, the engine, and `config.json`. A model is **not** bundled by default: on first run the runtime downloads the model named in `config.json` (`model_url`) into `userData/models`, resuming partial downloads and verifying the byte count. Pass `-Model path\to\model.gguf` to `build-windows.ps1` to bundle one instead.
+The installer bundles `Codai.exe`, the engine, `config.json`, the default model, and the MSVC runtime. First launch is fully offline. If the configured model is missing and `model_url` is set, the runtime downloads it into `userData/models`, resuming partial downloads and verifying the byte count. Pass `-Model path\to\model.gguf` to `build-windows.ps1` to bundle a different model.
 
 Code signing for the installer and executables is still pending.
 
@@ -214,7 +214,7 @@ Code signing for the installer and executables is still pending.
 |---|---|
 | Clean install success on a fresh Windows 10/11 machine | 95%+ |
 | Crash-free sessions | 99%+ |
-| Time from launch to ready chat (after model is downloaded) | Under 20 seconds on recommended hardware |
+| Time from launch to ready chat (after install) | Under 20 seconds on recommended hardware |
 | Orphaned processes after quit | 0 |
 | Accessibility audit (keyboard and contrast) | No critical issues |
 
@@ -244,7 +244,7 @@ Code signing for the installer and executables is still pending.
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Windows llama.cpp binaries are not yet available in `engine/` | Blocks Phase 1 | Build or download a Windows release early and verify it runs |
-| Large installer if the model is bundled | Slow download, poor first impression | Download the model on first run; ship without it |
+| Large installer because the model is bundled | Slow download, poor first impression | Accept the larger one-click installer so first launch is fully offline |
 | Unsigned installer triggers SmartScreen | Users distrust the app | Sign the installer; document the warning until signed |
 | Electron package size | Larger download than a Python-only app | Accept for v1; trim unused locales and assets |
 | Stale or crashed sidecar leaves ports occupied | App won't start | Dynamic ports, lock file with PID check, cleanup on start |
@@ -254,7 +254,7 @@ Code signing for the installer and executables is still pending.
 ## 14. Open Questions
 
 1. **Theme:** dark-only, or light and dark? (Recommendation: both, with system as default.)
-2. **Model delivery:** is the first-run download acceptable, or must the installer be fully offline?
+2. ~~**Model delivery:** is the first-run download acceptable, or must the installer be fully offline?~~ Resolved: the one-click installer includes the model and works fully offline.
 3. **Default model:** Gemma 3 1B (the code default) or Qwen 3.5 0.8B (the file currently in `models/`)?
 4. **Hardware target:** minimum RAM, CPU features, and whether GPU support is required in v1.
 5. **Conversation storage:** local-only, or is sync planned for later?

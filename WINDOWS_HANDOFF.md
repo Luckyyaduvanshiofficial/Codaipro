@@ -14,33 +14,33 @@ Branch: `main` at commit `90e2933` (pushed, in sync with `origin/main`)
 > built on Windows 11 and tested end to end (install, launch, chat, uninstall).
 > The installer is one-click and bundles the default model and the MSVC runtime.
 > Startup checks and the model-ready gate were added. Tests are now **36 Python**
-> and **14 desktop**. The `v3.1.0` tag has **not** been created yet.
+> and **14 desktop**. The `v3.1.0` tag and GitHub release are published.
 
 ---
 
 ## 1. Where the project stands
 
-All development work is **done, committed, and pushed**. The website is
-**already live** with the v3.1 content. What is left is the part that can only
-run on Windows: producing `dist\Codai.exe` and the NSIS installer.
+All development work is **done, committed, and pushed**. The Windows build is
+complete, the website is live with the v3.1 content, and the `v3.1.0` release
+is published.
 
 | Area | Status |
 |---|---|
 | Python runtime bug fixes + security hardening | Done, pushed |
-| First-run model download | Done, pushed, tested |
+| Bundled model + first-run download fallback | Done, pushed, tested |
 | Electron desktop app (window, tray, chat UI) | Done, pushed |
-| Tests: 34 Python, 8 desktop | All passing |
+| Tests: 36 Python, 14 desktop | All passing |
 | Website update (v3.1) | Done, **deployed and verified live** |
 | Changelog, README, INSTALLATION.md, PRD | Done, pushed |
 | Release CI (builds installer on tag) | Done, pushed |
-| `dist\Codai.exe` | **NOT BUILT** — requires Windows |
-| Windows `engine\llama-server.exe` | **NOT PRESENT** — downloaded by the build script |
-| NSIS installer | **NOT BUILT** — requires the two items above |
-| Git tag `v3.1.0` / GitHub release | **NOT CREATED** — deliberately deferred until the exe is verified |
+| `dist\Codai.exe` | Built and verified on Windows 11 |
+| Windows `engine\llama-server.exe` | Downloaded by the build script and bundled |
+| NSIS installer | Built and published in the v3.1.0 release |
+| Git tag `v3.1.0` / GitHub release | Published with the installer and portable zip |
 
-**Do not create the `v3.1.0` tag until the installer has been built and checked.**
-The user explicitly asked to build the exe first, then publish. Creating the tag
-triggers the release workflow and publishes publicly.
+**The `v3.1.0` tag is now published.** The installer was built and checked
+first; the tag triggered the release workflow, which published the installer
+and portable zip. Keep the same order for future releases.
 
 ---
 
@@ -246,10 +246,9 @@ is `test_second_instance_is_blocked_by_live_owner` in `tests/test_runtime.py`.
 - Code signing for the installer and `Codai.exe`. Until then SmartScreen warns;
   the docs tell users to choose **More info → Run anyway**.
 - Auto-update (`electron-updater`) — not wired up.
-- The `.github/workflows/release.yml` job was written but has **not run yet**.
-  The first tagged build is the real test of that workflow. If it fails, the
-  likely culprits are the `npm ci` step or artifact paths; the installer lands in
-  `build/desktop/`.
+- The release workflow ran successfully for `v3.1.0` and published both assets.
+  If a future run fails, the likely culprits are the `npm ci` step, the model
+  download, or artifact paths; the installer lands in `build/desktop/`.
 
 ---
 
