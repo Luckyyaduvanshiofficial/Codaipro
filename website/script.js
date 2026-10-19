@@ -1,8 +1,7 @@
 // CodaiPro website — reveal-on-scroll, live star count, real poll.
-// The poll stores votes as GitHub issues in the public repository and counts
-// them through the public GitHub API. No accounts, no cookies, no backend.
-// Everything degrades gracefully: without JS or when the API is unreachable,
-// the vote links still work and the page still reads fine.
+// The poll stores votes as JSON in the visitor's own browser (localStorage).
+// No accounts, no cookies, no backend. Everything degrades gracefully: without
+// JS the page still reads fine, and the star count keeps a static fallback.
 
 (function () {
     "use strict";
