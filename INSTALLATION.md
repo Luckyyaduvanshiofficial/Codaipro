@@ -4,8 +4,8 @@ Codai Pro is a desktop app that runs a language model on your own computer.
 Nothing is uploaded and nothing needs an account. You can install it, or run it
 from a folder with no installation at all.
 
-**Requirements:** Windows 10 or 11 (64-bit), 4 GB RAM minimum. About 1 GB of
-disk for the app, plus 0.5–5 GB for a model depending on which you choose.
+**Requirements:** Windows 10 or 11 (64-bit), 4 GB RAM minimum. About 1.5 GB of
+disk including the default model; larger models need more.
 
 ---
 
@@ -16,13 +16,12 @@ disk for the app, plus 0.5–5 GB for a model depending on which you choose.
    https://github.com/Luckyyaduvanshiofficial/Codaipro/releases/latest
 2. Run it. Windows SmartScreen may warn because the build is not code-signed.
    Choose "More info" → "Run anyway".
-3. Pick an install folder and finish the wizard.
-4. Launch Codai Pro from the Start menu or the desktop shortcut.
+3. The one-click installer extracts and installs automatically, then launches
+   Codai Pro. Start menu and desktop shortcuts are created.
 ```
 
-The first launch downloads a model (about 0.55 GB) into your user data folder
-and shows progress in the splash screen. After that, startup is fast and
-everything runs offline.
+The installer includes the default model, so the first launch only has to load
+it — there is no download. Startup is fast and everything runs offline.
 
 Your chats are stored at:
 
@@ -52,9 +51,9 @@ are kept so a reinstall picks up where you left off. Delete
 4. Wait for [READY]. Your browser opens the chat at http://127.0.0.1:8081/.
 ```
 
-The zip includes `Codai.exe` and the official `engine\llama-server.exe`. If no
-model is present, the first run downloads the default one, so the first startup
-takes as long as the download.
+The zip includes `Codai.exe` and the official `engine\llama-server.exe`, but not
+a model. If no model is present, the first run downloads the default one, so the
+first startup takes as long as the download.
 
 Leave the launcher window open while you work. Press any key in it to stop
 Codai cleanly. `kill.bat` force-stops everything if a launch ever goes wrong.
@@ -133,8 +132,9 @@ layers.
 
 ## Models
 
-Codai Pro runs quantized GGUF models. It ships with a default and downloads it
-on first run, but you can use any GGUF you like.
+Codai Pro runs quantized GGUF models. The Windows installer ships with the
+default model; the portable zip and source runs download it on first run if it
+is missing. You can use any GGUF you like.
 
 **Default:** `Qwen_Qwen3.5-0.8B-Q4_K_M.gguf` (0.58 GB) — small, fast, and
 newest of the tiny models.
@@ -175,13 +175,15 @@ Direct download links are on the [website](https://luckyyaduvanshiofficial.githu
 
 ## First run
 
-1. The app starts the runtime and shows a splash with real progress.
-2. If the model is missing, it is downloaded once.
+1. The app checks the installation before launch: runtime, engine, VC++ runtime,
+   model, free disk, and available memory.
+2. If the model is missing, it is downloaded once. The Windows installer includes
+   it, so normally there is no download.
 3. The engine loads the model (this can take up to a minute on a slow disk).
-4. The chat window opens when everything is ready.
+4. The chat window opens only after the model can actually answer.
 
-If startup fails, the app shows the reason and the log folder location instead
-of failing silently.
+If startup fails, the app shows the exact reason with **Try again**,
+**Open logs folder**, and **Quit** buttons instead of a blank window.
 
 ---
 
@@ -205,11 +207,20 @@ downloads resume automatically on the next launch, so simply starting again is
 usually enough. To download by hand, put the `.gguf` in the `models` folder and
 start the app.
 
+### "Codai Pro found a problem before launch"
+
+The app checks its own installation before starting and names the file or
+resource that is missing. The most common cause is antivirus quarantine of
+`Codai.exe`, `llama-server.exe`, or the model. Restore the file or add an
+exclusion for the Codai Pro folder, then choose **Try again**. If that does not
+help, reinstall. Details are written to `%APPDATA%\Codai Pro\logs\preflight.log`.
+
 ### "Loading model" or the reply fails right after launch
 
-The engine is still loading. Wait for the status in the top right to read
-**Ready**. On slower machines the first load of a larger model can take a
-minute.
+The desktop app keeps the chat window hidden until the model can answer, so
+this should not happen there. In the portable/browser build, wait for the status
+in the top right to read **Ready**. On slower machines the first load of a larger
+model can take a minute.
 
 ### Port already in use
 
@@ -225,8 +236,10 @@ to remove the stale `logs\codai.lock`.
 
 Open **Logs** and read `engine.log` for the engine's own error, and `codai.log`
 for the controller's. The most common causes are too little RAM for the chosen
-model and a corrupted model download. Delete the model and let it download
-again, or pick a smaller one.
+model and a corrupted model file. The app lowers its context automatically when
+available memory is low; if it still crashes with a memory error, close other
+apps or pick a smaller model. Delete a corrupted model and let it download
+again.
 
 ### Replies are slow
 

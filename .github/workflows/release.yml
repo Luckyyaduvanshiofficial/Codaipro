@@ -50,6 +50,28 @@ jobs:
         Get-ChildItem engine | Select-Object -First 10
         if (-not (Test-Path "engine/llama-server.exe")) { throw "llama-server.exe missing after extraction" }
 
+        # Bundle the MSVC runtime app-local so clean machines can start the engine.
+        foreach ($dll in @('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+          $source = Join-Path $env:WINDIR "System32\$dll"
+          if (Test-Path $source) { Copy-Item $source engine/ -Force }
+          else { throw "Required MSVC runtime $dll not found on the runner" }
+        }
+
+    - name: Bundle the default AI model
+      shell: pwsh
+      run: |
+        $config = Get-Content config.json | ConvertFrom-Json
+        if (-not $config.model_url) { throw "config.json has no model_url to bundle" }
+        New-Item -ItemType Directory -Force models | Out-Null
+        $target = "models\$($config.model_name)"
+        if (-not (Test-Path $target)) {
+          Write-Host "Downloading $($config.model_name)"
+          Invoke-WebRequest $config.model_url -OutFile $target
+        }
+        $size = (Get-Item $target).Length
+        if ($size -lt 8MB) { throw "Downloaded model is too small: $size bytes" }
+        Write-Host "Bundled model: $target ($size bytes)"
+
     - name: Build Codai.exe
       run: |
         python -m PyInstaller Codai.spec
@@ -109,6 +131,9 @@ jobs:
       working-directory: desktop
       env:
         ELECTRON_BUILDER_CACHE: ${{ github.workspace }}\.cache\electron-builder
+        # The model makes the payload large; level 1 avoids the 32-bit 7-Zip
+        # allocator running out of memory on smaller runners.
+        ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
       run: |
         # Version comes from the release tag so the installer matches the release.
         $version = "${{ env.VERSION }}".TrimStart('v')
@@ -135,6 +160,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Compute version number
+      id: version
+      shell: bash
+      run: echo "number=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
     - name: Download portable artifact
       uses: actions/download-artifact@v4
       with:
@@ -155,35 +185,45 @@ jobs:
         body: |
           ## Codai Pro ${{ env.VERSION }}
 
-          Codai Pro is now a **native Windows desktop app**. It opens in its own window with a ChatGPT-style chat, keeps your history, streams answers token by token, and downloads the model for you on first launch — so there is no file to hunt down before you can start.
+          Codai Pro is now a **native Windows desktop app**. It opens in its own window with a ChatGPT-style chat, keeps your history, streams answers token by token, and the installer includes the default model — so there is no file to hunt down or download before you can start.
 
           ### New in this release
+          - **One-click installer**: one extraction/progress screen, then Codai Pro installs per-user and launches automatically
+          - **Bundled model**: the Windows installer includes the default model, so first launch is fully offline (no first-run download)
+          - **Bundled runtime**: the MSVC runtime ships app-local, so users do not need the VC++ Redistributable
           - **Desktop app**: native window, tray icon, chat history, search, rename, and delete
           - **Chat interface**: streaming answers, markdown, syntax-highlighted code with copy buttons, Stop that keeps partial output, Regenerate, and light/dark themes
-          - **First-run model download**: resumable, with progress — the installer no longer ships a model
+          - **Startup checks**: the app verifies its runtime, engine, VC++ runtime, model, disk, and memory before opening the chat window, and shows **Try again / Open logs folder / Quit** instead of a blank screen
+          - **Model-ready gate**: the chat window opens only after llama-server can actually answer, so the first message cannot hit "Loading model"
+          - **Low-memory fallback**: context size steps down automatically when available RAM is tight
+          - **Crash recovery**: an unexpected engine exit offers **Restart** without closing the app
           - **Security**: every local API request now requires a per-session token, the `Host` header is validated against loopback to block DNS rebinding, and the wildcard CORS policy is gone
           - **Reliability**: the engine restarts after a crash instead of stalling, config errors are reported clearly, and the instance lock handles PID reuse
+          - **Cleanup**: removed the legacy Inno Setup script, v3.0-era docs, the duplicate PRD case variant, and unused assets
+
+          **Direct downloads:** [Windows installer](https://github.com/Luckyyaduvanshiofficial/Codaipro/releases/latest/download/CodaiPro_Setup_${{ steps.version.outputs.number }}.exe) · [Portable zip](https://github.com/Luckyyaduvanshiofficial/Codaipro/releases/latest/download/CodaiPro-${{ env.VERSION }}-Portable-Windows.zip)
 
           ### Two downloads
 
           | File | What it is |
           |---|---|
-          | `CodaiPro_Setup_*.exe` | **Installer (recommended).** Start menu and desktop shortcuts, uninstaller, chats saved in `%APPDATA%`. |
-          | `CodaiPro-*-Portable-Windows.zip` | **Portable.** Unzip to a writable folder or USB stick and run `run.bat`. Opens in your browser. |
+          | `CodaiPro_Setup_*.exe` | **Installer (recommended).** One-click: extracts, installs, and launches. Start menu and desktop shortcuts, uninstaller, includes the default model, chats saved in `%APPDATA%`. |
+          | `CodaiPro-*-Portable-Windows.zip` | **Portable.** Unzip to a writable folder or USB stick and run `run.bat`. Opens in your browser; downloads the model on first run. |
 
           ### First run
-          1. Install (or unzip) and launch Codai Pro.
-          2. Wait while it downloads the model once (~0.55 GB) and loads it.
+          1. Install and launch Codai Pro.
+          2. Wait while the bundled model loads. The portable zip downloads the model once instead.
           3. Chat. After this, everything runs offline.
 
           ### Notes
           - The installer is not code-signed yet, so Windows SmartScreen may warn. Choose **More info → Run anyway**.
+          - If antivirus quarantines a file, the app names it before launch and offers **Try again**, **Open logs folder**, and **Quit**.
           - You can use any GGUF model: set `model_name` and `model_url` in `config.json`, or drop a file into `models\`.
 
           ### System requirements
           - Windows 10/11 (64-bit)
           - 4 GB RAM minimum (8 GB recommended)
-          - ~1 GB for the app, plus 0.5–5 GB for a model
+          - ~1.5 GB installed including the default model; larger models need more
 
           **Full changelog**: [CHANGELOG.md](https://github.com/Luckyyaduvanshiofficial/Codaipro/blob/${{ env.VERSION }}/CHANGELOG.md) · [Install guide](https://github.com/Luckyyaduvanshiofficial/Codaipro/blob/${{ env.VERSION }}/INSTALLATION.md)
         draft: false

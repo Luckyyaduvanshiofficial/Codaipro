@@ -19,7 +19,7 @@
 
 ## What changed in v3.1
 
-Codai Pro now has a **native Windows app**. It opens in its own window with a ChatGPT-style interface — conversation history, streaming answers, markdown with syntax-highlighted code, a stop button, and light/dark themes — instead of a browser tab. The first launch **downloads the model for you**, resumable if your connection drops, so there is no model hunting before you can start.
+Codai Pro now has a **native Windows app**. It opens in its own window with a ChatGPT-style interface — conversation history, streaming answers, markdown with syntax-highlighted code, a stop button, and light/dark themes — instead of a browser tab. The installer **ships with the default model**, so the first launch only has to load it: no download and no model hunting before you can start.
 
 Under the hood the local API is locked down: every request needs a per-session token, the `Host` header is validated against loopback to block DNS rebinding, and the wildcard CORS policy is gone. The engine also recovers from crashes instead of stalling.
 
@@ -32,7 +32,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full list.
 - **100% Offline** — inference happens on your CPU; nothing leaves the machine
 - **Real desktop app** — native window, tray icon, no terminal and no browser tab
 - **Real llama.cpp engine** — `llama-server` with streaming, not a Python wrapper
-- **Model included on first run** — the app downloads it once, with progress and resume
+- **Model included** — the Windows installer ships the default model, so there is nothing to download
 - **Self-healing** — engine health monitor, auto-restart, stale lock recovery, crash reports
 - **Hardware-aware** — RAM/CPU tiers tune context size and threads automatically
 - **Portable option** — one folder on a USB stick; `run.bat` does everything
@@ -43,8 +43,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the full list.
 
 ```text
 1. Download CodaiPro_Setup_3.1.0.exe from the releases page and run it
-2. Launch Codai Pro from the Start menu
-3. Wait while it downloads the model (one time, ~0.55 GB) and loads it
+2. The one-click installer extracts and launches Codai Pro automatically
+3. Wait while it loads the bundled model (a few seconds)
 4. Chat
 ```
 
@@ -57,9 +57,9 @@ See [CHANGELOG.md](CHANGELOG.md) for the full list.
 4. Press any key in the launcher window to stop Codai safely
 ```
 
-Both packages include `Codai.exe` and the official `engine\llama-server.exe`. If
-no model is present, the first run downloads the default one; you can also drop
-any `.gguf` into `models/` yourself.
+Both packages include `Codai.exe` and the official `engine\llama-server.exe`. The
+installer also bundles the default model. If a model is missing, the first run
+downloads it; you can also drop any `.gguf` into `models/` yourself.
 
 Full instructions and troubleshooting: [INSTALLATION.md](INSTALLATION.md).
 
@@ -86,7 +86,7 @@ From source you also need the engine binary in `engine/`:
 
 ## 🧠 Downloading a Model
 
-Codai Pro runs a local GGUF model. The default is **Qwen3.5-0.8B**, and if it is missing the app downloads it on first run using `model_url` in `config.json`. To use another model, either drop the `.gguf` into `models/` and set `"model_name"`, or set both `"model_name"` and `"model_url"` and let the app fetch it.
+Codai Pro runs a local GGUF model. The Windows installer includes the default **Qwen3.5-0.8B**. If the model is missing, the app downloads it using `model_url` in `config.json`. To use another model, either drop the `.gguf` into `models/` and set `"model_name"`, or set both `"model_name"` and `"model_url"` and let the app fetch it.
 
 **Weak lab PC? Take a tiny one — under 1 GB, runs on almost anything:**
 
@@ -139,7 +139,8 @@ Codaipro/
 - **Desktop shell** starts the Python runtime as a sidecar on a reserved pair of free ports, waits for readiness, then opens the chat window. It passes the port and session token to the renderer over IPC; the renderer never touches Node or the network directly.
 - **Controller** starts the proxy, boots the engine, tracks lifecycle phases, performs graceful shutdown.
 - **Proxy** authenticates every API call, validates the `Host` header, and forwards `/v1/chat/completions` to the engine with request IDs, queue control, and SSE streaming.
-- **Engine manager** validates the binary, downloads the model if needed, waits for readiness, monitors health every 5s, and restarts up to 3 times.
+- **Engine manager** validates the binary and bundled VC++ runtime, downloads the model if needed, waits until the model can actually answer, monitors health every 5s, and restarts up to 3 times.
+- **Preflight checks** verify the runtime, engine, model, disk space, and available memory before the window opens, with a recovery dialog instead of a blank screen.
 
 The browser UI (`ui/`) still ships for the portable build. The desktop app has its own renderer and does not open a browser.
 
@@ -169,7 +170,7 @@ Logs land in `logs/codai.log`, `logs/engine.log`, `logs/crash.log`. Debug mode (
 
 - **OS**: Windows 10/11 (64-bit) for the packaged release; Linux/macOS from source
 - **RAM**: 4GB minimum, 8GB recommended
-- **Storage**: ~1GB for the app + 0.5–5GB for one model
+- **Storage**: ~1.5GB installed including the default model; more for larger models
 - **Runtime**: Python 3.10+ with `psutil` (source mode only), llama.cpp `llama-server` engine
 - **UI**: Electron desktop app (packaged) or your browser (portable build)
 - **Node.js**: 20+ for building the desktop app from source

@@ -61,8 +61,24 @@ if (-not $SkipEngine) {
     $tmp = Join-Path $env:TEMP 'codai-engine-extract'
     if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
     Expand-Archive $zip -DestinationPath $tmp
-    New-Item -ItemType Directory -Force -Path (Join-Path $root 'engine') | Out-Null
-    Get-ChildItem $tmp -Recurse -File | ForEach-Object { Copy-Item $_.FullName (Join-Path $root 'engine') -Force }
+    $engineDir = Join-Path $root 'engine'
+    New-Item -ItemType Directory -Force -Path $engineDir | Out-Null
+    # Remove stale binaries (for example a Linux build) so only the Windows engine is packaged.
+    Get-ChildItem $engineDir -Force | Remove-Item -Recurse -Force
+    Get-ChildItem $tmp -Recurse -File | ForEach-Object { Copy-Item $_.FullName $engineDir -Force }
+
+    # llama-server links against the MSVC runtime. Bundle it app-local so a clean
+    # Windows machine without the VC++ Redistributable can still start the engine.
+    foreach ($dll in @('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+        $systemDll = Join-Path $env:WINDIR "System32\$dll"
+        if (Test-Path $systemDll) {
+            Copy-Item $systemDll $engineDir -Force
+        }
+        else {
+            Write-Warning "Visual C++ runtime $dll was not found in System32; machines without the VC++ Redistributable may fail to start the engine."
+        }
+    }
+
     Remove-Item $zip, $tmp -Recurse -Force -ErrorAction SilentlyContinue
 
     if (-not (Test-Path (Join-Path $root 'engine\llama-server.exe'))) {
@@ -88,6 +104,10 @@ if ($SkipDesktop) {
 
 # ---------------------------------------------------------------- installer
 Step 'Installing desktop dependencies'
+$modelFiles = @(Get-ChildItem (Join-Path $root 'models') -Filter '*.gguf' -File -ErrorAction SilentlyContinue)
+if ($modelFiles.Count -eq 0) {
+    Write-Warning 'No .gguf model in models\; the app will download one on first run.'
+}
 Push-Location (Join-Path $root 'desktop')
 try {
     if (Test-Path 'package-lock.json') { npm ci --include=dev } else { npm install --include=dev }

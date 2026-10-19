@@ -33,11 +33,11 @@ win:
   icon: assets/icon.ico
   artifactName: "CodaiPro_Setup_${version}.${ext}"
 nsis:
-  oneClick: false
+  oneClick: true
   perMachine: false
-  allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Codai Pro
   uninstallDisplayName: Codai Pro
   deleteAppDataOnUninstall: false
+  runAfterFinish: true

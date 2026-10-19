@@ -8,8 +8,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ## [3.1.0] — 2026-10-19
 
 The desktop release. Codai Pro now runs in its own window instead of a browser
-tab, the local runtime is locked down, and installing no longer means hunting
-for a model file.
+tab, the local runtime is locked down, and the Windows installer includes the
+model so installing is a single step.
 
 ### Added
 
@@ -26,14 +26,28 @@ for a model file.
   `Ctrl+,` settings.
 - Settings for system prompt, creativity, and maximum response length.
 - Tray icon with hide-to-tray on close and a clean quit path.
+- One-click Windows installer: a single extraction/progress screen, then the
+  app launches automatically.
 - Conversation history stored locally and restored on launch.
-- Splash screen that reports real startup phases, including model download and
-  model load.
+- Splash screen that reports real startup phases, including model load.
+- The chat window opens only after the model can actually answer requests.
 
-**First-run model download**
+**Startup reliability**
 
-- The installer no longer needs to ship a model. If the configured model is
-  missing and `model_url` is set, the runtime downloads it on first run.
+- Preflight checks verify the runtime, engine, VC++ runtime, model, free disk,
+  and available memory before the window opens.
+- Startup failures show **Try again**, **Open logs folder**, and **Quit** with
+  the exact reason instead of a blank window.
+- An unexpected runtime exit offers **Restart** without closing the app.
+- Context size steps down automatically when available RAM is low, avoiding
+  `bad allocation` failures on loaded 8 GB machines.
+
+**Bundled model and first-run download**
+
+- The Windows installer ships the default model, so the first launch is fully
+  offline.
+- If the configured model is missing and `model_url` is set, the runtime
+  downloads it on first run.
 - Downloads resume from a partial file after an interrupted connection.
 - Transient failures retry with backoff.
 - The byte count is verified before the file is used.
@@ -44,13 +58,17 @@ for a model file.
   official llama.cpp CPU engine, produces `dist\Codai.exe`, then builds the
   NSIS installer with electron-builder.
 - Pass `-Model path\to\model.gguf` to bundle a model with the installer.
+- The MSVC runtime (`msvcp140.dll`, `vcruntime140.dll`, `vcruntime140_1.dll`)
+  is bundled app-local so the engine starts without the VC++ Redistributable.
+- The release workflow downloads the default model before packaging, so
+  published installers are self-contained.
 
 **Tests**
 
-- 34 Python tests covering config validation, proxy auth, Host checks, stream
-  truncation, and the downloader.
-- 8 desktop tests covering SSE parsing, message validation, the conversation
-  store, and runtime path resolution.
+- 36 Python tests covering config validation, proxy auth, Host checks, stream
+  truncation, hardware tiers, and the downloader.
+- 14 desktop tests covering SSE parsing, message validation, the conversation
+  store, runtime path resolution, installation preflight, and context planning.
 
 ### Security
 
