@@ -5,6 +5,34 @@ All notable changes to Codai Pro are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The approved **Offset Frame** brand identity is now in use everywhere: the
+  website masthead and footer, favicon and PWA icons, social preview image, the
+  desktop splash and welcome screen, the app, installer, executable, and tray
+  icon, the browser UI, and the README (with light and dark variants). The full
+  source package lives in `branding/`.
+- Brand accent colors replace the old green and blue in the desktop app, the
+  browser UI, and the logs page.
+
+### Fixed
+
+- The app refused to launch from a source checkout because the preflight
+  required a packaged `runtime/Codai.exe`. Preflight is now mode-aware: source
+  checkouts validate `dev/controller.py`, while packaged builds still require
+  the bundled runtime.
+- A missing platform engine or model no longer blocks the window in a source
+  checkout. The window opens and explains the problem with the exact path.
+- Startup failures that happened before the renderer finished loading were lost,
+  leaving the app stuck on "Starting…". The reason is now retained and shown on
+  load.
+- The fallback error text now highlights the failing log lines instead of
+  including the whole shutdown transcript.
+- The desktop test script now runs `preflight.test.js` as well as
+  `desktop.test.js`.
+
 ## [3.1.0] — 2026-10-19
 
 The desktop release. Codai Pro now runs in its own window instead of a browser

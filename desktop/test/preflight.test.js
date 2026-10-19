@@ -129,3 +129,55 @@ test('context planning steps down for total or available memory pressure', () =>
   assert.equal(planContext({ totalBytes: 4 * 1024 ** 3, availableBytes: 6 * 1024 ** 3 }).ctx, 1024);
   assert.equal(planContext({ totalBytes: 16 * 1024 ** 3, availableBytes: 12 * 1024 ** 3 }).ctx, 2048);
 });
+
+function runSource(install) {
+  return runPreflight({
+    resourcePath: install.resources,
+    userDataDir: install.userData,
+    logDir: path.join(install.userData, 'logs'),
+    isPackaged: false,
+  });
+}
+
+test('source mode checks the Python controller instead of runtime/Codai.exe', () => {
+  const install = makeInstall();
+  try {
+    fs.rmSync(path.join(install.resources, 'runtime'), { recursive: true, force: true });
+    fs.mkdirSync(path.join(install.resources, 'dev'), { recursive: true });
+    fs.writeFileSync(path.join(install.resources, 'dev', 'controller.py'), '# controller\n');
+    const report = runSource(install);
+    assert.equal(report.details.mode, 'source');
+    assert.match(report.details.runtimePath, /dev[\\/]controller\.py$/);
+    assert.ok(!report.problems.some((p) => p.code === 'runtime'));
+  } finally {
+    cleanup(install);
+  }
+});
+
+test('source mode opens the window when the platform engine is missing', () => {
+  const install = makeInstall();
+  try {
+    fs.rmSync(path.join(install.resources, 'runtime'), { recursive: true, force: true });
+    fs.mkdirSync(path.join(install.resources, 'dev'), { recursive: true });
+    fs.writeFileSync(path.join(install.resources, 'dev', 'controller.py'), '# controller\n');
+    const engineName = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server';
+    fs.rmSync(path.join(install.resources, 'engine', engineName));
+    const report = runSource(install);
+    assert.equal(report.ok, true, JSON.stringify(report.problems));
+    assert.ok(report.warnings.some((w) => w.code === 'engine-missing'));
+  } finally {
+    cleanup(install);
+  }
+});
+
+test('source mode blocks when dev/controller.py is missing', () => {
+  const install = makeInstall();
+  try {
+    fs.rmSync(path.join(install.resources, 'runtime'), { recursive: true, force: true });
+    const report = runSource(install);
+    assert.equal(report.ok, false);
+    assert.ok(report.problems.some((p) => p.code === 'runtime'));
+  } finally {
+    cleanup(install);
+  }
+});

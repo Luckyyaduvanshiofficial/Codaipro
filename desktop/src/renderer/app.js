@@ -608,6 +608,11 @@
       state.runtimeReady = true;
       setStatus('Ready', 'ready');
       refreshSendState();
+    } else if (runtime.error) {
+      state.runtimeReady = false;
+      setStatus('Engine stopped', 'error');
+      showNotice(runtime.error, 'error');
+      refreshSendState();
     } else {
       setStatus('Starting...', '');
     }

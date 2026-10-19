@@ -44,6 +44,8 @@ let quitting = false;
 let runtimePort = null;
 let runtimeToken = null;
 let activeChat = null;
+// Kept so a renderer that loads after a fast failure still sees the reason.
+let lastRuntimeError = null;
 let mainWindowReady = false;
 
 // Only one Codai window and runtime may exist. A second launch focuses the first.
@@ -92,6 +94,7 @@ function createMainWindow() {
     minHeight: 560,
     show: false,
     title: 'Codai Pro',
+    icon: path.join(__dirname, '..', '..', 'assets', 'app-icon-256.png'),
     backgroundColor: '#0f1115',
     autoHideMenuBar: true,
     webPreferences: {
@@ -134,7 +137,7 @@ function createMainWindow() {
 }
 
 function createTray() {
-  const iconPath = path.join(__dirname, '..', '..', 'assets', 'icon.ico');
+  const iconPath = path.join(__dirname, '..', '..', 'assets', 'tray.png');
   try {
     tray = new Tray(iconPath);
   } catch {
@@ -212,7 +215,10 @@ function registerIpc() {
     isPackaged: app.isPackaged,
   }));
 
-  ipcMain.handle('runtime:info', () => ({ ready: runtimePort !== null }));
+  ipcMain.handle('runtime:info', () => ({
+    ready: runtimePort !== null,
+    error: lastRuntimeError,
+  }));
 
   ipcMain.handle('data:load', () => store.load());
 
@@ -329,7 +335,8 @@ function watchRuntime() {
 
     runtimePort = null;
     runtimeToken = null;
-    sendToRenderer('runtime:error', { message: 'The AI engine stopped unexpectedly.' });
+    lastRuntimeError = 'The AI engine stopped unexpectedly.';
+    sendToRenderer('runtime:error', { message: lastRuntimeError });
 
     let failure = info?.error?.message
       || `The runtime exited with code ${info?.code ?? 'unknown'}.`;
@@ -371,6 +378,7 @@ function preflightReport() {
     resourcePath: RESOURCE_ROOT,
     userDataDir: app.getPath('userData'),
     logDir: logDirectory(),
+    isPackaged: app.isPackaged,
   });
 }
 
@@ -403,11 +411,21 @@ async function boot() {
 
     try {
       await startRuntime();
+      lastRuntimeError = null;
       watchRuntime();
       showMainWindow();
       return;
     } catch (error) {
+      lastRuntimeError = error.message;
       sendToRenderer('runtime:error', { message: error.message });
+
+      // In a source checkout, open the window and show the reason there instead of
+      // trapping the developer behind a modal retry loop.
+      if (IS_DEV) {
+        showMainWindow();
+        return;
+      }
+
       const choice = await promptFailure({
         title: 'Codai Pro could not start',
         message: 'The AI engine did not start correctly.',

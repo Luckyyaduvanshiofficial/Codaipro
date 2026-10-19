@@ -90,3 +90,4 @@ test('runtime resolves Codai.exe for packaged builds and the controller for sour
   });
   assert.match(source.args[0], /dev[\\/]controller\.py$/);
 });
+

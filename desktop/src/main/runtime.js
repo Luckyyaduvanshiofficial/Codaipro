@@ -55,7 +55,10 @@ function isPortFree(port) {
 function readLogTail(filePath, maxLines = 12) {
   try {
     const lines = fs.readFileSync(filePath, 'utf8').trimEnd().split(/\r?\n/);
-    return lines.slice(-maxLines).join('\n');
+    // Prefer the lines that explain the failure; shutdown chatter hides the cause.
+    const important = lines.filter((line) =>
+      /\[(ERROR|CRITICAL)\s*\]|^\s*(Detail|Hint|Logs)\s*:/i.test(line));
+    return (important.length > 0 ? important : lines).slice(-maxLines).join('\n');
   } catch {
     return '';
   }

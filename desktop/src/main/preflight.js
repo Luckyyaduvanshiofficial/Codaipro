@@ -108,13 +108,14 @@ function formatGb(bytes) {
  * Validate everything the desktop app needs before it starts. Returns problems
  * that must block launch and warnings that are safe to continue with.
  */
-function runPreflight({ resourcePath, userDataDir, logDir }) {
+function runPreflight({ resourcePath, userDataDir, logDir, isPackaged = true }) {
   const problems = [];
   const warnings = [];
   const details = {
     resourcePath,
     userDataDir,
     platform: process.platform,
+    mode: isPackaged ? 'packaged' : 'source',
   };
 
   const addProblem = (code, message, hint) => problems.push({ code, message, hint });
@@ -131,16 +132,26 @@ function runPreflight({ resourcePath, userDataDir, logDir }) {
     );
   }
 
-  const runtimeExe = path.join(resourcePath, 'runtime', 'Codai.exe');
+  // A packaged build ships a single runtime executable. A source checkout runs the
+  // Python controller directly, so requiring runtime/Codai.exe there would block
+  // every development launch for no reason.
+  const runtimeExe = isPackaged
+    ? path.join(resourcePath, 'runtime', 'Codai.exe')
+    : path.join(resourcePath, 'dev', 'controller.py');
   const runtime = fileStats(runtimeExe);
   details.runtimePath = runtimeExe;
-  if (!runtime.exists || runtime.size < MIN_BINARY_BYTES) {
+  const minRuntimeBytes = isPackaged ? MIN_BINARY_BYTES : 1;
+  if (!runtime.exists || runtime.size < minRuntimeBytes) {
     addProblem(
       'runtime',
-      `The bundled Codai runtime is missing or incomplete: ${runtimeExe}`,
-      'Reinstall Codai Pro. If antivirus quarantined the file, restore it or add an exclusion for the Codai Pro folder, then click Try again.',
+      isPackaged
+        ? `The bundled Codai runtime is missing or incomplete: ${runtimeExe}`
+        : `The Python runtime entry point is missing: ${runtimeExe}`,
+      isPackaged
+        ? 'Reinstall Codai Pro. If antivirus quarantined the file, restore it or add an exclusion for the Codai Pro folder, then click Try again.'
+        : 'Run the desktop app from the repository root, or set CODAI_PROJECT_ROOT to the folder that contains dev/controller.py.',
     );
-  } else if (process.platform === 'win32' && !hasMagic(runtimeExe, 'MZ')) {
+  } else if (isPackaged && process.platform === 'win32' && !hasMagic(runtimeExe, 'MZ')) {
     addProblem(
       'runtime-corrupt',
       `The bundled Codai runtime is not a valid Windows program: ${runtimeExe}`,
@@ -154,12 +165,22 @@ function runPreflight({ resourcePath, userDataDir, logDir }) {
   const engine = fileStats(engineExe);
   details.enginePath = engineExe;
   if (!engine.exists || engine.size < MIN_ENGINE_BYTES) {
-    addProblem(
-      'engine',
-      `The AI engine is missing or incomplete: ${engineExe}`,
-      'Reinstall Codai Pro. Antivirus sometimes quarantines llama-server.exe; restore it or add an exclusion, then click Try again.',
-    );
-  } else if (process.platform === 'win32' && !hasMagic(engineExe, 'MZ')) {
+    if (isPackaged) {
+      addProblem(
+        'engine',
+        `The AI engine is missing or incomplete: ${engineExe}`,
+        'Reinstall Codai Pro. Antivirus sometimes quarantines llama-server.exe; restore it or add an exclusion, then click Try again.',
+      );
+    } else {
+      // A source checkout on a different platform may only have the other OS build.
+      // Open the window anyway and surface the problem instead of refusing to launch.
+      addWarning(
+        'engine-missing',
+        `The AI engine for this platform is missing: ${engineExe}`,
+        `Place the llama.cpp ${engineName} binary in ${engineDir}. The window will open, but chat will not work until it is present.`,
+      );
+    }
+  } else if (isPackaged && process.platform === 'win32' && !hasMagic(engineExe, 'MZ')) {
     addProblem(
       'engine-corrupt',
       `The AI engine is not a valid Windows program: ${engineExe}`,
@@ -221,11 +242,17 @@ function runPreflight({ resourcePath, userDataDir, logDir }) {
         `The AI model (${modelName}) is not installed and will be downloaded on first launch.`,
         'This needs an internet connection and about 0.6 GB of free disk space.',
       );
-    } else {
+    } else if (isPackaged) {
       addProblem(
         'model',
         `The AI model is missing or incomplete: ${modelName}`,
         `Reinstall Codai Pro, or place ${modelName} in ${path.join(resourcePath, 'models')}. If antivirus quarantined it, restore it or add an exclusion.`,
+      );
+    } else {
+      addWarning(
+        'model-missing',
+        `The AI model is missing: ${modelName}`,
+        `Place a .gguf model in ${path.join(resourcePath, 'models')}, or set model_url in config.json. The window will open, but chat will not work until a model is present.`,
       );
     }
   } else if (!hasMagic(modelPath, 'GGUF')) {
