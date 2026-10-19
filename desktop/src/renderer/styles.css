@@ -3,13 +3,13 @@
   --mono: "Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, monospace;
   --radius: 12px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --accent: #10a37f;
-  --accent-2: #2563eb;
   --danger: #ef4444;
   --warn: #f59e0b;
 }
 
 :root[data-theme="dark"] {
+  --accent: #E66C55;
+  --accent-2: #E66C55;
   --bg: #0f1115;
   --sidebar: #171a21;
   --surface: #1c2029;
@@ -23,6 +23,8 @@
 }
 
 :root[data-theme="light"] {
+  --accent: #C23A24;
+  --accent-2: #C23A24;
   --bg: #ffffff;
   --sidebar: #f5f6f8;
   --surface: #ffffff;
@@ -141,9 +143,8 @@ button { cursor: pointer; }
 }
 .welcome h1 { font-size: 28px; font-weight: 600; margin: 14px 0 6px; }
 .welcome p { color: var(--muted); margin: 0 0 28px; }
-.logo-mark {
-  width: 56px; height: 56px; margin: 0 auto; border-radius: 16px; display: grid; place-items: center;
-  background: linear-gradient(135deg, rgba(16,163,127,0.15), rgba(37,99,235,0.15));
+.brand-mark {
+  width: 56px; height: 56px; display: block; margin: 0 auto;
 }
 .suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .suggestion {
@@ -274,11 +275,11 @@ button { cursor: pointer; }
 /* Splash */
 body.splash { display: grid; place-items: center; background: #0f1115; color: #e7e9ee; }
 .splash-card { text-align: center; padding: 20px; }
-.splash-card h1 { font-size: 20px; margin: 14px 0 4px; font-weight: 600; }
+.splash-logo { width: 220px; height: auto; display: block; margin: 0 auto 16px; }
 .splash-card p { margin: 0; color: #9aa3b2; font-size: 13px; min-height: 1.2em; }
 .splash-bar { margin: 18px auto 0; width: 220px; height: 4px; border-radius: 4px; background: #232834; overflow: hidden; }
 .splash-bar span {
-  display: block; height: 100%; width: 35%; background: linear-gradient(90deg, #10a37f, #2563eb);
+  display: block; height: 100%; width: 35%; background: linear-gradient(90deg, #C23A24, #E66C55);
   animation: slide 1.3s var(--ease) infinite;
 }
 @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }

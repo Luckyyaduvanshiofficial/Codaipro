@@ -39,5 +39,8 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: Codai Pro
   uninstallDisplayName: Codai Pro
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico
   deleteAppDataOnUninstall: false
   runAfterFinish: true

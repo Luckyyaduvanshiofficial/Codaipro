@@ -2,6 +2,11 @@
 
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="branding/final/logo-dark.svg">
+  <img alt="Codai Pro" src="branding/final/logo-light.svg" width="260">
+</picture>
+
 ![CodaiPro Logo](https://img.shields.io/badge/CodaiPro-v3.1-blue?style=for-the-badge&logo=python)
 [![Open Source](https://img.shields.io/badge/Open%20Source-❤️-red?style=for-the-badge)](https://github.com/Luckyyaduvanshiofficial/Codaipro)
 [![Offline Ready](https://img.shields.io/badge/Works%20Offline-✅-green?style=for-the-badge)](https://github.com/Luckyyaduvanshiofficial/Codaipro)

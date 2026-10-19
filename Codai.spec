@@ -25,6 +25,7 @@ exe = EXE(
     a.datas,
     [],
     name='Codai',
+    icon='branding/final/app-icon.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
