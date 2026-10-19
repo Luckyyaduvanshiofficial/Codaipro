@@ -1,0 +1,197 @@
+[
+  {
+    "file": "final/README.md",
+    "bytes": 1060,
+    "sha256": "5e8f3cb28a51c9d549a477c9ed5c8e50c9ff0458ed5b90d7fce5a12208e28172"
+  },
+  {
+    "file": "final/app-icon.ico",
+    "bytes": 105436,
+    "sha256": "6ab15692df80d69fd416016acfdfa96bb5d6239f73bd547306e06a906a910851"
+  },
+  {
+    "file": "final/app-icon.svg",
+    "bytes": 435,
+    "sha256": "38684e371b76340db83aecd091bfbf7fdc9c91a9950d800d32bfe6eff0af915e"
+  },
+  {
+    "file": "final/favicon-tiny-source.svg",
+    "bytes": 450,
+    "sha256": "5f348e17d6fd40624500adfb510282f8294c6dfeceb64933345ed3e9d1504352"
+  },
+  {
+    "file": "final/favicon.svg",
+    "bytes": 434,
+    "sha256": "771e37e28c87e8a784912f748086a787c98fe7e925af1dde100b49005663aebb"
+  },
+  {
+    "file": "final/logo-dark.svg",
+    "bytes": 3925,
+    "sha256": "87e450d916911789f2ed4a4b23f19fb480cce3d5e9860bba197fa29483c385ba"
+  },
+  {
+    "file": "final/logo-light.svg",
+    "bytes": 3926,
+    "sha256": "2a08acf75ccd6893d597ee6f335b166c1a03f77f7b2d9eec6933ec1a4be64552"
+  },
+  {
+    "file": "final/logo-monochrome-reversed.svg",
+    "bytes": 3923,
+    "sha256": "737d0af6f1229033a40607f8bc41c58ee8783f44c19879245d26b86c54762035"
+  },
+  {
+    "file": "final/logo-monochrome.svg",
+    "bytes": 3917,
+    "sha256": "fb786b81f0325c040e7a5dbeed1bdd835acfa729a801c766f65be609ed09aabc"
+  },
+  {
+    "file": "final/logo-primary.svg",
+    "bytes": 3912,
+    "sha256": "10e5dc95adfca95d79e9162ac9b725de842cc761c7f20776abbd5eb6bae1c7ae"
+  },
+  {
+    "file": "final/logo-symbol-dark.svg",
+    "bytes": 412,
+    "sha256": "73386ff6cb723a6e1b0bbe27afba184714953eabd336b21647e3fd81bb6c16f5"
+  },
+  {
+    "file": "final/logo-symbol-monochrome.svg",
+    "bytes": 403,
+    "sha256": "f342258eadef7e22fae1072fe272cdcbff2cbf4e0e29408ea38c99918cc91cab"
+  },
+  {
+    "file": "final/logo-symbol-reversed.svg",
+    "bytes": 406,
+    "sha256": "129218bb8dccdef6a4b779068c31f514eebd01d404057eb27236d54bd13a95f7"
+  },
+  {
+    "file": "final/logo-symbol.svg",
+    "bytes": 403,
+    "sha256": "cd117e4eed480f3fb7fc9b4980774b17d9e0cc3cfef60277ed51aebb78ba40af"
+  },
+  {
+    "file": "final/png/app-icon-128.png",
+    "bytes": 1486,
+    "sha256": "e0667d61b86bb6d5c558dddab429c228406002849925a32a428577ae8f0023f9"
+  },
+  {
+    "file": "final/png/app-icon-16.png",
+    "bytes": 333,
+    "sha256": "770918fc71c6fb82732917550e6211af2b0097f9e70982b8882e857daf321cee"
+  },
+  {
+    "file": "final/png/app-icon-192.png",
+    "bytes": 2170,
+    "sha256": "a8f54c253811056a8b7f81bba40d2e42af1fc30348fcfac183421ee95b1946bd"
+  },
+  {
+    "file": "final/png/app-icon-24.png",
+    "bytes": 399,
+    "sha256": "360721405adb3151084f6e5c90fdfb4f02de64ba3d483987cedc0b8b3f913af3"
+  },
+  {
+    "file": "final/png/app-icon-256.png",
+    "bytes": 2923,
+    "sha256": "2cbe881cf4ebe268153778e38185bc14f13571472f2cf16d346880187054f5fc"
+  },
+  {
+    "file": "final/png/app-icon-32.png",
+    "bytes": 503,
+    "sha256": "c64cf07a6cd00b65486d6970bfc56b12a598745415056b24c9c7907e55eb3225"
+  },
+  {
+    "file": "final/png/app-icon-48.png",
+    "bytes": 637,
+    "sha256": "80f4eadd1573be5609ac99aaafc4d325b86630cb31cf6925536d4ded577932b7"
+  },
+  {
+    "file": "final/png/app-icon-512.png",
+    "bytes": 6251,
+    "sha256": "09496f3b3502c32a82bd77504770d6bfc11ada9e8894d931500fa348e195c88e"
+  },
+  {
+    "file": "final/png/app-icon-64.png",
+    "bytes": 809,
+    "sha256": "629537c371546ac005cd22a98db4b1e7bc409c6fc718e62be0f6559e01c28fac"
+  },
+  {
+    "file": "final/png/apple-touch-icon.png",
+    "bytes": 1909,
+    "sha256": "09f8276c109e2a1c1d35d1cb109cf2f464eb6fbfd1534435678eae639e9f3098"
+  },
+  {
+    "file": "final/png/favicon-16.png",
+    "bytes": 333,
+    "sha256": "770918fc71c6fb82732917550e6211af2b0097f9e70982b8882e857daf321cee"
+  },
+  {
+    "file": "final/png/favicon-32.png",
+    "bytes": 503,
+    "sha256": "c64cf07a6cd00b65486d6970bfc56b12a598745415056b24c9c7907e55eb3225"
+  },
+  {
+    "file": "final/png/favicon-48.png",
+    "bytes": 637,
+    "sha256": "80f4eadd1573be5609ac99aaafc4d325b86630cb31cf6925536d4ded577932b7"
+  },
+  {
+    "file": "final/png/logo-dark-preview.png",
+    "bytes": 14549,
+    "sha256": "2b3d84a074597a33943eea6c3ee4526c5c7d1c76cf8c82cfa40401d391f1c016"
+  },
+  {
+    "file": "final/png/logo-light-preview.png",
+    "bytes": 14915,
+    "sha256": "4dfcbd291117db1d1086c47f863b2ae19b2d16f7dda5ac2201ec58d37e4c9d59"
+  },
+  {
+    "file": "final/png/logo-monochrome-preview.png",
+    "bytes": 14904,
+    "sha256": "686d7b9ac3a547f669b53c16657ada6d2f33a23e6614acae76adbb564211f987"
+  },
+  {
+    "file": "final/png/logo-monochrome-reversed-preview.png",
+    "bytes": 14491,
+    "sha256": "052832784d82be8f6d2015ce400161ff4bdb0e8ce5e7f9377544b75a5f3ff5ab"
+  },
+  {
+    "file": "final/png/logo-primary-preview.png",
+    "bytes": 14915,
+    "sha256": "4dfcbd291117db1d1086c47f863b2ae19b2d16f7dda5ac2201ec58d37e4c9d59"
+  },
+  {
+    "file": "final/png/logo-symbol-128.png",
+    "bytes": 653,
+    "sha256": "7c722bfafa66304a9cfcf2116bf3109c7688370f11705eaf2b63b1587590dd2e"
+  },
+  {
+    "file": "final/png/logo-symbol-16.png",
+    "bytes": 251,
+    "sha256": "c1178afc97e4e836b8f3fa0c9f7c8e4e5b6b4eed8d945ca0efdd857e947ad4de"
+  },
+  {
+    "file": "final/png/logo-symbol-24.png",
+    "bytes": 287,
+    "sha256": "b89ec3e96ed9dee3b0fb7f13b65bd31fbccbf139a5c97655b3205d51aec80e12"
+  },
+  {
+    "file": "final/png/logo-symbol-256.png",
+    "bytes": 1140,
+    "sha256": "62fe6e0e4c271f10e3cc95c2a31b4518395b8d516b3ab3eadc3009cecb4707a6"
+  },
+  {
+    "file": "final/png/logo-symbol-32.png",
+    "bytes": 299,
+    "sha256": "ffac758aadfcfeddb2881f2e660b7561229b9f42d1393b57e5a016c92af579f3"
+  },
+  {
+    "file": "final/png/logo-symbol-48.png",
+    "bytes": 373,
+    "sha256": "81b95605731216b9c24a299865c2f83fff52e4c61327d1d5613d9791c518798c"
+  },
+  {
+    "file": "final/png/logo-symbol-64.png",
+    "bytes": 452,
+    "sha256": "43f94ca3c68021a6cf7531e27eff6e8397f489b48bdf42a034cb833d42df5ba4"
+  }
+]
