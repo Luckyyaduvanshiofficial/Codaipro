@@ -94,8 +94,8 @@
        ---------------------------------------------------------------------- */
 
     var POLL_OPTIONS = [
-        { label: "Gemma 3 1B" },
         { label: "Qwen3.5-0.8B" },
+        { label: "Gemma 3 1B" },
         { label: "Qwen2.5-Coder-3B" },
         { label: "Qwen2.5-Coder-7B" },
         { label: "Something else" }
