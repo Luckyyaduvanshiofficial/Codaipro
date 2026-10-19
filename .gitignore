@@ -105,9 +105,6 @@ secrets.json
 # Codai Pro (v3+) layout
 # ---------------------------------------------------------------------------
 
-# Parallel-development working copy (has its own .git)
-Codaipro2.0/
-
 # Engine binary is downloaded per-machine / fetched in CI
 engine/
 
