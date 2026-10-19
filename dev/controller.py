@@ -10,6 +10,7 @@ import logging
 import logging.handlers
 import os
 import platform
+import secrets
 import signal
 import sys
 import threading
@@ -23,8 +24,10 @@ if PROJECT_ROOT not in sys.path:
 
 from dev.config import (  # noqa: E402
     CONFIG_FILENAME,
+    LOG_BACKUP_COUNT,
     LOG_DATE_FORMAT,
     LOG_FORMAT,
+    LOG_MAX_BYTES,
     PHASE_ANALYZING_HW,
     PHASE_BINDING_PORT,
     PHASE_CRASHED,
@@ -32,7 +35,9 @@ from dev.config import (  # noqa: E402
     PHASE_LOADING_MODEL,
     PHASE_READY,
     PHASE_SHUTTING_DOWN,
+    VALID_LOG_LEVELS,
     CodaiConfig,
+    ENGINE_READY_TIMEOUT,
     get_base_path,
 )
 from dev.engine import EngineManager  # noqa: E402
@@ -41,13 +46,16 @@ from dev.system import analyze_system_resources  # noqa: E402
 
 logger = logging.getLogger("codai")
 
+TOKEN_FILENAME = "session.token"
+
 
 class CodaiController:
-    """Production-grade orchestrator for the Codai local AI runtime."""
+    """Orchestrator for the Codai local AI runtime."""
 
     def __init__(self) -> None:
         self.config = CodaiConfig()
-        self.base_path = get_base_path()
+        self.base_path = os.environ.get("CODAI_BASE_PATH") or get_base_path()
+        self.resource_path = os.environ.get("CODAI_RESOURCE_PATH") or self.base_path
         self.engine: EngineManager | None = None
         self._proxy: CodaiProxyServer | None = None
         self._proxy_thread: threading.Thread | None = None
@@ -55,6 +63,7 @@ class CodaiController:
         self._current_phase = PHASE_INITIALIZING
         self._fatal_error: str = ""
         self._exit_code: int = 0
+        self._api_token = os.environ.get("CODAI_API_TOKEN") or secrets.token_urlsafe(32)
 
     def _console_rule(self, char: str = "=") -> str:
         return char * 58
@@ -87,7 +96,7 @@ class CodaiController:
         print(f"   Detail     : {detail}")
         if hint:
             print(f"   Hint       : {hint}")
-        print("   Logs       : logs\\codai.log")
+        print(f"   Logs       : {os.path.join(self.base_path, 'logs', 'codai.log')}")
         print()
 
     def _describe_failure_hint(self, exc: BaseException) -> str:
@@ -97,11 +106,11 @@ class CodaiController:
         if isinstance(exc, TimeoutError):
             return "Startup timed out. The engine may be busy, blocked, or still warming up."
         if "already running" in message.lower():
-            return "Another instance may still be open. Close it or remove a stale logs\\codai.lock file."
+            return "Another instance may still be open. Close it or remove a stale logs/codai.lock file."
         if "port" in message.lower():
             return "A local port is unavailable. Check for another app using the same port in config.json."
         if "permission" in message.lower() or "access" in message.lower():
-            return "Windows may be blocking access. Try running from a normal writable folder."
+            return "The OS may be blocking access. Try running from a normal writable folder."
         return "Check the latest log lines for the exact failing step."
 
     def _write_crash_report(self, exc: BaseException) -> str:
@@ -119,9 +128,11 @@ class CodaiController:
         return crash_log
 
     def _setup_logging(self) -> None:
-        """Configure console and rotating file logging safely."""
-        level_name = getattr(self.config, "log_level", "INFO").upper()
-        level = getattr(logging, level_name, logging.INFO)
+        """Configure console and rotating file logging."""
+        level_name = str(self.config.log_level).upper()
+        if level_name not in VALID_LOG_LEVELS:
+            level_name = "INFO"
+        level = getattr(logging, level_name)
         root = logging.getLogger()
         root.setLevel(level)
 
@@ -145,8 +156,8 @@ class CodaiController:
 
         file_handler = logging.handlers.RotatingFileHandler(
             log_path,
-            maxBytes=5 * 1024 * 1024,
-            backupCount=3,
+            maxBytes=LOG_MAX_BYTES,
+            backupCount=LOG_BACKUP_COUNT,
             encoding="utf-8",
         )
         file_handler.setLevel(logging.DEBUG)
@@ -198,6 +209,10 @@ class CodaiController:
         signal.signal(signal.SIGTERM, _handler)
 
     def _launch_ui(self) -> None:
+        # The desktop shell renders its own window; opening a browser tab would duplicate it.
+        if os.environ.get("CODAI_NO_BROWSER", "").strip().lower() in {"1", "true", "yes", "on"}:
+            logger.info("Browser launch disabled (CODAI_NO_BROWSER).")
+            return
         url = f"http://127.0.0.1:{self.config.port}/"
         try:
             webbrowser.open(url)
@@ -219,7 +234,6 @@ class CodaiController:
         logger.info("")
 
     def run(self) -> int:
-        engine_port = self.config.port + 1
         try:
             self._print_terminal_banner()
             self._setup_logging()
@@ -228,9 +242,10 @@ class CodaiController:
             logger.info("=" * 48)
 
             self._set_phase(PHASE_INITIALIZING, engine_status="initializing")
-            config_path = os.path.join(self.base_path, CONFIG_FILENAME)
+            config_path = os.path.join(self.resource_path, CONFIG_FILENAME)
             self.config.load_from_file(config_path)
             self.config.load_from_env()
+            self._setup_logging()
 
             self._set_phase(PHASE_ANALYZING_HW, engine_status="initializing")
             analyze_system_resources(self.config)
@@ -243,6 +258,7 @@ class CodaiController:
                 engine_port=engine_port,
                 on_crash=self._on_engine_crash,
                 on_status_change=self._on_engine_status_change,
+                resource_path=self.resource_path,
             )
 
             try:
@@ -250,7 +266,18 @@ class CodaiController:
             except RuntimeError as exc:
                 logger.critical("Singleton lock failed: %s", exc)
                 self._set_phase(PHASE_CRASHED, engine_status="failed", error_message=str(exc))
-                raise SystemExit(1) from exc
+                self._fatal_error = str(exc)
+                self._exit_code = 1
+                self._print_failure_panel(
+                    "ALREADY RUNNING",
+                    str(exc),
+                    self._describe_failure_hint(exc),
+                )
+                return self._exit_code
+
+            # Signals are handled from here on, so Ctrl+C or a stop request during
+            # the slow model load still runs the shutdown path below.
+            self._register_signals()
 
             self.engine.check_port_available()
 
@@ -260,8 +287,10 @@ class CodaiController:
                 self.config,
                 self.base_path,
                 engine_port=engine_port,
+                api_token=self._api_token,
                 shutdown_callback=self._shutdown_event.set,
             )
+            self._write_token_file()
             self._set_phase(PHASE_LOADING_MODEL, engine_status="starting")
             self._proxy_thread = threading.Thread(
                 target=self._proxy.serve_forever,
@@ -277,67 +306,62 @@ class CodaiController:
 
             self.engine.boot()
             self._set_phase(PHASE_BINDING_PORT, engine_status="starting")
-            self.engine.wait_for_ready(timeout=90)
+            self.engine.wait_for_ready(timeout=ENGINE_READY_TIMEOUT)
             self.engine.start_health_monitor()
             self._set_phase(PHASE_READY, engine_status="running")
 
-            self._register_signals()
             self._launch_ui()
             self._print_banner()
             self._shutdown_event.wait()
         except KeyboardInterrupt:
             logger.info("Keyboard interrupt received.")
             self._exit_code = 0
-        except SystemExit:
-            raise
         except FileNotFoundError as exc:
             logger.critical("Dependency missing: %s", exc)
-            self._set_phase(PHASE_CRASHED, engine_status="failed", error_message=str(exc))
-            self._fatal_error = str(exc)
-            self._exit_code = 1
-            self._print_failure_panel(
-                "STARTUP FAILED",
-                str(exc),
-                self._describe_failure_hint(exc),
-            )
+            self._fail("STARTUP FAILED", exc)
         except TimeoutError as exc:
             logger.critical("Startup timeout: %s", exc)
-            self._set_phase(PHASE_CRASHED, engine_status="failed", error_message=str(exc))
-            self._fatal_error = str(exc)
-            self._exit_code = 1
-            self._print_failure_panel(
-                "STARTUP TIMED OUT",
-                str(exc),
-                self._describe_failure_hint(exc),
-            )
+            self._fail("STARTUP TIMED OUT", exc)
         except RuntimeError as exc:
             logger.critical("Runtime error: %s", exc)
-            self._set_phase(PHASE_CRASHED, engine_status="failed", error_message=str(exc))
-            self._fatal_error = str(exc)
-            self._exit_code = 1
-            self._print_failure_panel(
-                "RUNTIME FAILED",
-                str(exc),
-                self._describe_failure_hint(exc),
-            )
-        except Exception as exc:  # pragma: no cover - fatal guard
+            self._fail("RUNTIME FAILED", exc)
+        except Exception as exc:  # fatal guard
             logger.critical("Fatal exception: %s", exc, exc_info=True)
-            self._set_phase(PHASE_CRASHED, engine_status="failed", error_message=str(exc))
-            self._fatal_error = str(exc)
-            self._exit_code = 1
             crash_log = self._write_crash_report(exc)
-            self._print_failure_panel(
-                "UNEXPECTED FATAL ERROR",
-                str(exc),
-                f"Full traceback saved to {crash_log}",
-            )
+            self._fail("UNEXPECTED FATAL ERROR", exc, f"Full traceback saved to {crash_log}")
         finally:
             self._shutdown()
         return self._exit_code
 
+    def _token_path(self) -> str:
+        return os.path.join(self.base_path, "logs", TOKEN_FILENAME)
+
+    def _write_token_file(self) -> None:
+        """Expose the session token to the local launcher only (owner-readable file)."""
+        path = self._token_path()
+        fd = os.open(path, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(self._api_token)
+
+    def _remove_token_file(self) -> None:
+        try:
+            os.unlink(self._token_path())
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            logger.warning("Could not remove token file: %s", exc)
+
+    def _fail(self, title: str, exc: BaseException, hint: str | None = None) -> None:
+        self._set_phase(PHASE_CRASHED, engine_status="failed", error_message=str(exc))
+        self._fatal_error = str(exc)
+        self._exit_code = 1
+        self._print_failure_panel(title, str(exc), hint or self._describe_failure_hint(exc))
+
     def _shutdown(self) -> None:
         self._set_phase(PHASE_SHUTTING_DOWN, engine_status="shutting_down")
         logger.info("Performing full system shutdown...")
+
+        self._remove_token_file()
 
         if self._proxy:
             try:
@@ -367,8 +391,8 @@ if __name__ == "__main__":
         sys.exit(CodaiController().run())
     except SystemExit:
         raise
-    except Exception as exc:  # pragma: no cover - startup guard
-        crash_log_dir = os.path.join(PROJECT_ROOT, "logs")
+    except Exception as exc:  # startup guard
+        crash_log_dir = os.path.join(get_base_path(), "logs")
         os.makedirs(crash_log_dir, exist_ok=True)
         crash_log = os.path.join(crash_log_dir, "crash.log")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
