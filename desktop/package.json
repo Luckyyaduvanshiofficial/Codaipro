@@ -1,0 +1,22 @@
+{
+  "name": "codai-pro-desktop",
+  "productName": "Codai Pro",
+  "version": "3.0.0",
+  "description": "Codai Pro - offline AI coding assistant for Windows",
+  "author": "Codai",
+  "license": "MIT",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/desktop.test.js",
+    "build:win": "electron-builder --win --x64 --config electron-builder.yml",
+    "build:dir": "electron-builder --dir --config electron-builder.yml"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "electron": "^39.8.10",
+    "electron-builder": "^26.15.3"
+  }
+}
