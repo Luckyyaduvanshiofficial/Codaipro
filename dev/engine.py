@@ -6,6 +6,7 @@ health monitoring, crash recovery, and safe shutdown semantics.
 
 from __future__ import annotations
 
+import http.client
 import logging
 import os
 import socket
@@ -327,20 +328,43 @@ class EngineManager:
             self._notify_status("failed")
             raise
 
+    def _engine_http_ready(self) -> bool:
+        """Return True when llama-server reports HTTP 200 on /health.
+
+        The engine binds its port before the model finishes loading and answers
+        503 until it can serve requests, so a TCP check alone is not enough.
+        """
+        connection = http.client.HTTPConnection(
+            self.config.host, self.engine_port, timeout=2.0
+        )
+        try:
+            connection.request("GET", "/health")
+            response = connection.getresponse()
+            response.read()
+            return response.status == 200
+        except (OSError, http.client.HTTPException):
+            return False
+        finally:
+            connection.close()
+
     def wait_for_ready(self, timeout: int = ENGINE_READY_TIMEOUT) -> None:
         logger.info("Waiting for engine to become ready (timeout=%ds)...", timeout)
         started = time.time()
         delays = iter((0.2, 0.5, 1.0))
         delay = next(delays)
 
-        while not self.is_server_running(self.config.host, self.engine_port):
+        while not (
+            self.is_server_running(self.config.host, self.engine_port)
+            and self._engine_http_ready()
+        ):
             if self._stop_event.is_set():
                 self._notify_status("failed")
                 raise RuntimeError("Engine startup cancelled: shutdown requested.")
             if time.time() - started > timeout:
                 self._notify_status("failed")
                 raise TimeoutError(
-                    f"Engine failed to bind port {self.engine_port} within {timeout}s."
+                    f"Engine did not become ready on port {self.engine_port} within "
+                    f"{timeout}s (the model may still be loading)."
                 )
 
             with self._lock:

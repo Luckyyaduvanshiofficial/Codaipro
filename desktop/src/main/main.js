@@ -15,6 +15,7 @@ const {
 const { RuntimeManager } = require('./runtime');
 const { streamChat, validateChatRequest, ChatError } = require('./chat');
 const { DataStore, sanitizeSettings } = require('./store');
+const { runPreflight } = require('./preflight');
 
 const IS_DEV = !app.isPackaged;
 
@@ -43,6 +44,7 @@ let quitting = false;
 let runtimePort = null;
 let runtimeToken = null;
 let activeChat = null;
+let mainWindowReady = false;
 
 // Only one Codai window and runtime may exist. A second launch focuses the first.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -103,11 +105,8 @@ function createMainWindow() {
   });
 
   mainWindow.once('ready-to-show', () => {
-    if (splashWindow) {
-      splashWindow.close();
-      splashWindow = null;
-    }
-    mainWindow.show();
+    mainWindowReady = true;
+    if (runtimePort !== null) showMainWindow();
   });
 
   mainWindow.loadFile(rendererPath('index.html'));
@@ -163,6 +162,47 @@ function sendToRenderer(channel, payload) {
   if (channel === 'runtime:phase' && splashWindow && !splashWindow.isDestroyed()) {
     splashWindow.webContents.send('phase', payload);
   }
+}
+
+function showMainWindow() {
+  if (!mainWindowReady || !mainWindow || mainWindow.isDestroyed()) return;
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.close();
+    splashWindow = null;
+  }
+  mainWindow.show();
+}
+
+function logDirectory() {
+  return path.join(app.getPath('userData'), 'logs');
+}
+
+async function openLogsFolder() {
+  return shell.openPath(logDirectory());
+}
+
+function formatProblems(problems) {
+  return problems.map((problem) => {
+    const hint = problem.hint ? `\n   ${problem.hint}` : '';
+    return `- ${problem.message}${hint}`;
+  }).join('\n\n');
+}
+
+async function promptFailure({ title, message, problems, buttons = ['Try again', 'Open logs folder', 'Quit'] }) {
+  const options = {
+    type: 'error',
+    title,
+    message,
+    detail: `${formatProblems(problems)}\n\nLogs: ${logDirectory()}`.slice(0, 4000),
+    buttons,
+    defaultId: 0,
+    cancelId: buttons.length - 1,
+    noLink: true,
+  };
+  const result = (mainWindow && !mainWindow.isDestroyed())
+    ? await dialog.showMessageBox(mainWindow, options)
+    : await dialog.showMessageBox(options);
+  return result.response;
 }
 
 function registerIpc() {
@@ -227,8 +267,14 @@ function registerIpc() {
   });
 
   ipcMain.handle('runtime:restart', async () => {
-    await startRuntime();
-    return { ready: true };
+    try {
+      await startRuntime();
+      watchRuntime();
+      showMainWindow();
+      return { ready: true };
+    } catch (error) {
+      return { ready: false, error: error.message };
+    }
   });
 
   ipcMain.handle('shell:openLogs', () => {
@@ -249,6 +295,13 @@ function registerIpc() {
 }
 
 async function startRuntime() {
+  runtimePort = null;
+  runtimeToken = null;
+  if (runtime) {
+    await runtime.stop();
+    runtime = null;
+  }
+
   runtime = new RuntimeManager({
     projectRoot: PROJECT_ROOT,
     isPackaged: app.isPackaged,
@@ -266,6 +319,61 @@ async function startRuntime() {
   return port;
 }
 
+function watchRuntime() {
+  const current = runtime;
+  if (!current) return;
+
+  current.exited.then(async (info) => {
+    // Normal shutdown and deliberate restarts are handled elsewhere.
+    if (quitting || runtime !== current || runtimePort === null) return;
+
+    runtimePort = null;
+    runtimeToken = null;
+    sendToRenderer('runtime:error', { message: 'The AI engine stopped unexpectedly.' });
+
+    let failure = info?.error?.message
+      || `The runtime exited with code ${info?.code ?? 'unknown'}.`;
+
+    while (!quitting) {
+      const choice = await promptFailure({
+        title: 'Codai Pro stopped',
+        message: 'The AI engine stopped unexpectedly.',
+        problems: [{
+          message: failure,
+          hint: 'Choose Restart to bring the engine back. Diagnostics are in the logs folder.',
+        }],
+        buttons: ['Restart', 'Open logs folder', 'Quit'],
+      });
+
+      if (choice === 1) {
+        await openLogsFolder();
+        continue;
+      }
+      if (choice === 2) {
+        app.quit();
+        return;
+      }
+
+      try {
+        await startRuntime();
+        watchRuntime();
+        showMainWindow();
+        return;
+      } catch (error) {
+        failure = error.message;
+      }
+    }
+  });
+}
+
+function preflightReport() {
+  return runPreflight({
+    resourcePath: RESOURCE_ROOT,
+    userDataDir: app.getPath('userData'),
+    logDir: logDirectory(),
+  });
+}
+
 async function boot() {
   store = new DataStore(path.join(app.getPath('userData'), 'codai-data.json'));
   nativeTheme.themeSource = store.load().settings.theme;
@@ -274,14 +382,49 @@ async function boot() {
   createTray();
   createMainWindow();
 
-  try {
-    await startRuntime();
-  } catch (error) {
-    sendToRenderer('runtime:error', { message: error.message });
-    dialog.showErrorBox(
-      'Codai Pro could not start',
-      `${error.message}\n\nLogs are in: ${path.join(app.getPath('userData'), 'logs')}`,
-    );
+  while (!quitting) {
+    const report = preflightReport();
+    if (!report.ok) {
+      const choice = await promptFailure({
+        title: 'Codai Pro cannot start',
+        message: 'Codai Pro found a problem before launch.',
+        problems: report.problems,
+      });
+      if (choice === 1) {
+        await openLogsFolder();
+        continue;
+      }
+      if (choice === 2) {
+        app.quit();
+        return;
+      }
+      continue;
+    }
+
+    try {
+      await startRuntime();
+      watchRuntime();
+      showMainWindow();
+      return;
+    } catch (error) {
+      sendToRenderer('runtime:error', { message: error.message });
+      const choice = await promptFailure({
+        title: 'Codai Pro could not start',
+        message: 'The AI engine did not start correctly.',
+        problems: [{
+          message: error.message,
+          hint: 'Choose Try again. If it keeps happening, open the logs folder and share the files.',
+        }],
+      });
+      if (choice === 1) {
+        await openLogsFolder();
+        continue;
+      }
+      if (choice === 2) {
+        app.quit();
+        return;
+      }
+    }
   }
 }
 
@@ -295,6 +438,7 @@ async function shutdown() {
 
 if (gotSingleInstanceLock) {
   app.whenReady().then(() => {
+    app.setAppUserModelId('com.codai.pro');
     registerIpc();
     boot();
   });

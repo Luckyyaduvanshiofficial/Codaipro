@@ -8,7 +8,7 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/desktop.test.js",
+    "test": "node --test test/desktop.test.js test/preflight.test.js",
     "build:win": "electron-builder --win --x64 --config electron-builder.yml",
     "build:dir": "electron-builder --dir --config electron-builder.yml"
   },

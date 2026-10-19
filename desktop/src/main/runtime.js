@@ -7,7 +7,7 @@ const net = require('node:net');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const READY_TIMEOUT_MS = 100_000;
+const READY_TIMEOUT_MS = 180_000;
 const POLL_INTERVAL_MS = 500;
 const TOKEN_FILENAME = path.join('logs', 'session.token');
 
@@ -50,6 +50,15 @@ function isPortFree(port) {
       server.close(() => resolve(true));
     });
   });
+}
+
+function readLogTail(filePath, maxLines = 12) {
+  try {
+    const lines = fs.readFileSync(filePath, 'utf8').trimEnd().split(/\r?\n/);
+    return lines.slice(-maxLines).join('\n');
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -149,10 +158,19 @@ class RuntimeManager {
 
   /** Start the runtime and resolve once it reports ready. */
   async start({ onPhase = () => {} } = {}) {
+    if (this.child) {
+      await this.stop();
+    }
+    this.stopping = false;
     this.port = await findFreePortPair();
     this.token = crypto.randomBytes(32).toString('base64url');
 
     const { command, args, cwd } = resolveRuntimeCommand(this.options);
+    if (this.options.isPackaged && !fs.existsSync(command)) {
+      throw new Error(
+        `The bundled Codai runtime is missing: ${command}. Reinstall Codai Pro, or restore the file from your antivirus quarantine.`,
+      );
+    }
     const logDir = path.join(this.options.userDataDir, 'logs');
     fs.mkdirSync(logDir, { recursive: true });
     this.logStream = fs.createWriteStream(path.join(logDir, 'runtime-launcher.log'), { flags: 'a' });
@@ -179,11 +197,13 @@ class RuntimeManager {
       this.child.stderr.pipe(this.logStream, { end: false });
       this.child.on('exit', (code, signal) => {
         this.logStream.write(`[launcher] runtime exited code=${code} signal=${signal}\n`);
+        this.exitInfo = { code, signal };
         this.child = null;
         resolve({ code, signal });
       });
       this.child.on('error', (err) => {
         this.logStream.write(`[launcher] failed to start runtime: ${err.message}\n`);
+        this.exitInfo = { code: -1, signal: null, error: err };
         this.child = null;
         resolve({ code: -1, signal: null, error: err });
       });
@@ -199,7 +219,12 @@ class RuntimeManager {
 
     while (Date.now() < deadline) {
       if (this.child === null) {
-        throw new Error('The Codai runtime stopped during startup. See runtime-launcher.log for details.');
+        const tail = readLogTail(path.join(this.options.userDataDir, 'logs', 'runtime-launcher.log'));
+        const reason = this.exitInfo?.error?.message
+          || (this.exitInfo ? `exit code ${this.exitInfo.code}` : 'unknown reason');
+        throw new Error(
+          `The Codai runtime stopped during startup (${reason}).${tail ? `\n\n${tail}` : ''}`,
+        );
       }
 
       const health = await fetchHealth(this.port);
@@ -217,7 +242,9 @@ class RuntimeManager {
 
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
-    throw new Error('Codai did not become ready in time.');
+    throw new Error(
+      'Codai did not become ready in time. The model may still be loading; see the logs for details.',
+    );
   }
 
   /** Path of the session token file the runtime writes; kept for diagnostics. */

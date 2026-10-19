@@ -30,15 +30,24 @@ def analyze_system_resources(config: CodaiConfig) -> None:
     machines with fewer cores are not over-subscribed.
     """
     try:
-        total_ram_bytes = psutil.virtual_memory().total
-        config.ram_gb = round(total_ram_bytes / (1024 ** 3), 2)
-        logger.info("Hardware Analysis: %.2f GB RAM detected.", config.ram_gb)
+        memory = psutil.virtual_memory()
+        config.ram_gb = round(memory.total / (1024 ** 3), 2)
+        available_gb = round(memory.available / (1024 ** 3), 2)
+        logger.info(
+            "Hardware Analysis: %.2f GB RAM detected (%.2f GB available).",
+            config.ram_gb,
+            available_gb,
+        )
 
         physical_cores = psutil.cpu_count(logical=False) or 1
         config.cpu_cores = physical_cores
         logger.info("CPU cores (physical): %d", physical_cores)
 
-        if config.ram_gb < 2.5:
+        # Tier on total RAM, but step down when other programs have already
+        # consumed the memory the engine needs. Otherwise an 8 GB machine with
+        # a browser open tries the 2048 context and llama-server dies with a
+        # "bad allocation" error during the first reply.
+        if config.ram_gb < 2.5 or available_gb < 1.5:
             tier_ctx = 512
             tier_threads = 1
             config.ram_tier = "Tier 3 (Low RAM)"
@@ -46,7 +55,7 @@ def analyze_system_resources(config: CodaiConfig) -> None:
                 "%s: Limiting context to %d, max %d thread(s)",
                 config.ram_tier, tier_ctx, tier_threads,
             )
-        elif config.ram_gb < 6.0:
+        elif config.ram_gb < 6.0 or available_gb < 2.5:
             tier_ctx = 1024
             tier_threads = 2
             config.ram_tier = "Tier 2 (Standard)"

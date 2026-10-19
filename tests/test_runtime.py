@@ -83,6 +83,36 @@ class TestConfigValidation:
         system_module.analyze_system_resources(cfg)
         assert cfg.threads == 1
 
+    def test_low_available_memory_steps_context_down(self, monkeypatch):
+        monkeypatch.setattr(
+            system_module.psutil,
+            "virtual_memory",
+            lambda: type("Memory", (), {
+                "total": 8 * 1024 ** 3,
+                "available": 1 * 1024 ** 3,
+            })(),
+        )
+        monkeypatch.setattr(system_module.psutil, "cpu_count", lambda logical=False: 4)
+        cfg = CodaiConfig()
+        system_module.analyze_system_resources(cfg)
+        assert cfg.ctx == 512
+        assert cfg.ram_tier.startswith("Tier 3")
+
+    def test_plentiful_available_memory_keeps_high_tier(self, monkeypatch):
+        monkeypatch.setattr(
+            system_module.psutil,
+            "virtual_memory",
+            lambda: type("Memory", (), {
+                "total": 16 * 1024 ** 3,
+                "available": 12 * 1024 ** 3,
+            })(),
+        )
+        monkeypatch.setattr(system_module.psutil, "cpu_count", lambda logical=False: 8)
+        cfg = CodaiConfig()
+        system_module.analyze_system_resources(cfg)
+        assert cfg.ctx == 2048
+        assert cfg.ram_tier.startswith("Tier 1")
+
 
 # ---------------------------------------------------------------------------
 # Proxy security (live server on loopback)
