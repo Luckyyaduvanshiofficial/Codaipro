@@ -202,7 +202,9 @@ button { cursor: pointer; }
   background: var(--user-bubble); padding: 10px 16px; border-radius: 18px 18px 4px 18px; max-width: 80%;
   white-space: pre-wrap;
 }
-.msg.assistant .bubble { width: 100%; }
+.msg.assistant { gap: 10px; align-items: flex-start; }
+.msg.assistant .bubble { flex: 1; min-width: 0; }
+.msg-avatar { width: 22px; height: 22px; flex-shrink: 0; margin-top: 3px; border-radius: 6px; }
 .msg-actions { display: flex; gap: 4px; margin-top: 6px; opacity: 0; transition: opacity 150ms; }
 .msg:hover .msg-actions, .msg:focus-within .msg-actions { opacity: 1; }
 .msg-meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
@@ -281,7 +283,20 @@ button { cursor: pointer; }
 .send-btn:not(:disabled):hover { transform: scale(1.06); }
 .stop-btn { background: var(--danger); color: #fff; }
 .stop-btn:hover { transform: scale(1.06); }
-.hint { text-align: center; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.hint {
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  max-width: 760px; margin: 8px auto 0; font-size: 12px; color: var(--muted);
+}
+.hint-keys { color: var(--muted); opacity: 0.85; }
+
+/* Branded scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border); border-radius: 10px;
+  border: 2px solid transparent; background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
 
 /* Modal */
 .modal {

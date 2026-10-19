@@ -167,7 +167,9 @@
     if (matches.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'empty-search';
-      empty.textContent = query ? 'No chats match your search.' : 'No chats yet.';
+      empty.textContent = query
+        ? 'No chats match your search.'
+        : 'No chats yet. Ask a lab question to get started.';
       els.list.appendChild(empty);
       return;
     }
@@ -288,6 +290,16 @@
     const wrap = document.createElement('div');
     wrap.className = `msg ${message.role}`;
     wrap.dataset.index = String(index);
+
+    if (message.role === 'assistant') {
+      const avatar = document.createElement('img');
+      avatar.className = 'msg-avatar';
+      avatar.src = '../../assets/app-icon.svg';
+      avatar.alt = '';
+      avatar.width = 22;
+      avatar.height = 22;
+      wrap.appendChild(avatar);
+    }
 
     const column = document.createElement('div');
     column.className = 'bubble';
@@ -419,10 +431,16 @@
 
     const node = document.createElement('div');
     node.className = 'msg assistant';
+    const avatar = document.createElement('img');
+    avatar.className = 'msg-avatar';
+    avatar.src = '../../assets/app-icon.svg';
+    avatar.alt = '';
+    avatar.width = 22;
+    avatar.height = 22;
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
     bubble.innerHTML = '<div class="typing" aria-label="Generating"><span></span><span></span><span></span></div>';
-    node.appendChild(bubble);
+    node.append(avatar, bubble);
     els.messages.appendChild(node);
     scrollToBottom(true);
 
