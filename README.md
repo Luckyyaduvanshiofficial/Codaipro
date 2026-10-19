@@ -1,13 +1,13 @@
-# 🚀 CodaiPro v3.0 (Codai Pro) - Offline AI Coding Assistant
+# 🚀 Codai Pro v3.1 - Offline AI Coding Assistant
 
 <div align="center">
 
-![CodaiPro Logo](https://img.shields.io/badge/CodaiPro-v3.0-blue?style=for-the-badge&logo=python)
+![CodaiPro Logo](https://img.shields.io/badge/CodaiPro-v3.1-blue?style=for-the-badge&logo=python)
 [![Open Source](https://img.shields.io/badge/Open%20Source-❤️-red?style=for-the-badge)](https://github.com/Luckyyaduvanshiofficial/Codaipro)
 [![Offline Ready](https://img.shields.io/badge/Works%20Offline-✅-green?style=for-the-badge)](https://github.com/Luckyyaduvanshiofficial/Codaipro)
 [![Student Friendly](https://img.shields.io/badge/Perfect%20for%20Labs-🎓-orange?style=for-the-badge)](https://github.com/Luckyyaduvanshiofficial/Codaipro)
 
-**🌟 A private, offline AI coding assistant that runs the official llama.cpp engine and opens in your browser**
+**🌟 A private, offline AI coding assistant with a native desktop app and the official llama.cpp engine**
 
 *Built for lab exams, coding competitions, and any room where the network is off limits*
 
@@ -17,32 +17,51 @@
 
 ---
 
-## What changed in v3.0
+## What changed in v3.1
 
-The desktop GUI is gone. CodaiPro now runs the **official `llama-server` engine** from llama.cpp with a fast **browser chat UI** — streaming answers token by token, markdown rendering, code copy buttons, a stop button, and a controller that watches the engine and restarts it if it crashes. One folder, one script, no Python GUI toolkits, no heavyweight dependencies.
+Codai Pro now has a **native Windows app**. It opens in its own window with a ChatGPT-style interface — conversation history, streaming answers, markdown with syntax-highlighted code, a stop button, and light/dark themes — instead of a browser tab. The first launch **downloads the model for you**, resumable if your connection drops, so there is no model hunting before you can start.
+
+Under the hood the local API is locked down: every request needs a per-session token, the `Host` header is validated against loopback to block DNS rebinding, and the wildcard CORS policy is gone. The engine also recovers from crashes instead of stalling.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list.
 
 ![Codai architecture](docs/image/architechture-codai.svg)
 
-## ✨ Why CodaiPro?
+## ✨ Why Codai Pro?
 
 - **100% Offline** — inference happens on your CPU; nothing leaves the machine
+- **Real desktop app** — native window, tray icon, no terminal and no browser tab
 - **Real llama.cpp engine** — `llama-server` with streaming, not a Python wrapper
-- **Browser UI** — ChatGPT-style chat with markdown and code blocks, opened automatically
+- **Model included on first run** — the app downloads it once, with progress and resume
 - **Self-healing** — engine health monitor, auto-restart, stale lock recovery, crash reports
 - **Hardware-aware** — RAM/CPU tiers tune context size and threads automatically
-- **Portable** — one folder on a USB stick; `run.bat` does everything
+- **Portable option** — one folder on a USB stick; `run.bat` does everything
 
 ## 🚀 Quick Start (Windows)
 
+**Installer (recommended)**
+
 ```text
-1. Download the portable zip from releases and unzip to a writable folder
-2. Drop ONE .gguf model into the models/ folder (default: gemma-3-1b-it-Q4_K_M.gguf)
-3. Double-click run.bat
-4. Wait for [READY] - your browser opens http://127.0.0.1:8081/
-5. Press any key in the launcher window to stop Codai safely
+1. Download CodaiPro_Setup_3.1.0.exe from the releases page and run it
+2. Launch Codai Pro from the Start menu
+3. Wait while it downloads the model (one time, ~0.55 GB) and loads it
+4. Chat
 ```
 
-The release zip includes `Codai.exe` and the official `engine\llama-server.exe` — the only thing you add is a model.
+**Portable (no install)**
+
+```text
+1. Download the portable zip and unzip to a writable folder
+2. Double-click run.bat
+3. Wait for [READY] - your browser opens http://127.0.0.1:8081/
+4. Press any key in the launcher window to stop Codai safely
+```
+
+Both packages include `Codai.exe` and the official `engine\llama-server.exe`. If
+no model is present, the first run downloads the default one; you can also drop
+any `.gguf` into `models/` yourself.
+
+Full instructions and troubleshooting: [INSTALLATION.md](INSTALLATION.md).
 
 ## 🐍 Run from Source (Windows / Linux / macOS)
 
@@ -67,14 +86,14 @@ From source you also need the engine binary in `engine/`:
 
 ## 🧠 Downloading a Model
 
-CodaiPro runs a local GGUF model. Drop one `.gguf` file into the `models/` folder. The default expected by `config.json` is **Gemma 3 1B** — using a different file? Set `"model_name"` in `config.json` (or run `DOWNLOAD_MODEL.bat`).
+Codai Pro runs a local GGUF model. The default is **Qwen3.5-0.8B**, and if it is missing the app downloads it on first run using `model_url` in `config.json`. To use another model, either drop the `.gguf` into `models/` and set `"model_name"`, or set both `"model_name"` and `"model_url"` and let the app fetch it.
 
 **Weak lab PC? Take a tiny one — under 1 GB, runs on almost anything:**
 
 | Model | Size | Direct download (Q4_K_M) |
 |-------|------|--------------------------|
-| **Gemma 3 1B Instruct** (default) | 0.81GB | [Download](https://huggingface.co/bartowski/google_gemma-3-1b-it-GGUF/resolve/main/google_gemma-3-1b-it-Q4_K_M.gguf) · [Model page](https://huggingface.co/bartowski/google_gemma-3-1b-it-GGUF) |
-| **Qwen3.5-0.8B** (newest) | 0.58GB | [Download](https://huggingface.co/bartowski/Qwen_Qwen3.5-0.8B-GGUF/resolve/main/Qwen_Qwen3.5-0.8B-Q4_K_M.gguf) · [Model page](https://huggingface.co/bartowski/Qwen_Qwen3.5-0.8B-GGUF) |
+| **Qwen3.5-0.8B** (default) | 0.58GB | [Download](https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf) · [Model page](https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF) |
+| Gemma 3 1B Instruct | 0.81GB | [Download](https://huggingface.co/bartowski/google_gemma-3-1b-it-GGUF/resolve/main/google_gemma-3-1b-it-Q4_K_M.gguf) · [Model page](https://huggingface.co/bartowski/google_gemma-3-1b-it-GGUF) |
 | Qwen3-0.6B | 0.48GB | [Download](https://huggingface.co/bartowski/Qwen_Qwen3-0.6B-GGUF/resolve/main/Qwen_Qwen3-0.6B-Q4_K_M.gguf) · [Model page](https://huggingface.co/bartowski/Qwen_Qwen3-0.6B-GGUF) |
 | Llama 3.2 1B Instruct | 0.81GB | [Download](https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf) · [Model page](https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF) |
 
@@ -95,32 +114,43 @@ The Qwen 3 family thinks before it answers; the engine keeps the scratchpad out 
 ## 🏗️ Architecture
 
 ```text
-CodaiPro/
+Codaipro/
 ├── dev/
 │   ├── config.py       # config, constants, paths, env overrides
 │   ├── controller.py   # orchestrator: lifecycle, logging, shutdown
+│   ├── downloader.py   # resumable model download
 │   ├── engine.py       # llama-server process + health monitor + restart
-│   ├── proxy.py        # serves the UI, forwards API, streaming, telemetry
+│   ├── proxy.py        # auth, Host checks, streaming, telemetry
 │   └── system.py       # hardware analysis (RAM/CPU tiers)
+├── desktop/            # Electron app (window, tray, chat UI)
+│   ├── src/main/       # main process: runtime, chat IPC, storage
+│   ├── src/preload/    # narrow bridge exposed to the renderer
+│   └── src/renderer/   # chat interface (HTML/CSS/JS, no build step)
 ├── engine/             # llama-server binary (downloaded, not in git)
-├── models/             # your .gguf model (not in git)
-├── ui/                 # browser chat UI (index.html, app.js, styles.css)
-├── config.json         # port, model name, debug
-├── run.bat             # Windows launcher
+├── models/             # .gguf models (not in git)
+├── ui/                 # browser chat UI used by the portable build
+├── tests/              # Python test suite
+├── config.json         # port, model name, model URL, debug
+├── build-windows.ps1   # one-command Windows build
+├── run.bat             # portable launcher
 └── kill.bat            # force-clean processes and locks
 ```
 
-- **Controller** starts the proxy, boots the engine, tracks lifecycle phases, performs graceful shutdown
-- **Proxy** serves `ui/` and forwards `/v1/chat/completions` to the engine with request IDs, queue control, and SSE streaming
-- **Engine manager** validates the binary, waits for readiness, monitors health every 5s, auto-restarts up to 3 times
-- Ports: UI `8081`, engine `8082` (from `config.json` or `CODAI_PORT`)
+- **Desktop shell** starts the Python runtime as a sidecar on a reserved pair of free ports, waits for readiness, then opens the chat window. It passes the port and session token to the renderer over IPC; the renderer never touches Node or the network directly.
+- **Controller** starts the proxy, boots the engine, tracks lifecycle phases, performs graceful shutdown.
+- **Proxy** authenticates every API call, validates the `Host` header, and forwards `/v1/chat/completions` to the engine with request IDs, queue control, and SSE streaming.
+- **Engine manager** validates the binary, downloads the model if needed, waits for readiness, monitors health every 5s, and restarts up to 3 times.
+
+The browser UI (`ui/`) still ships for the portable build. The desktop app has its own renderer and does not open a browser.
 
 ## ⚙️ Configuration
 
 ```json
 {
   "port": 8081,
-  "model_name": "gemma-3-1b-it-Q4_K_M.gguf",
+  "model_name": "Qwen_Qwen3.5-0.8B-Q4_K_M.gguf",
+  "model_url": "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
+  "model_size": 0,
   "ctx": 2048,
   "threads": 4,
   "host": "127.0.0.1",
@@ -129,7 +159,9 @@ CodaiPro/
 }
 ```
 
-Environment overrides: `CODAI_PORT`, `CODAI_MODEL`, `CODAI_CTX`, `CODAI_THREADS`, `CODAI_HOST`, `CODAI_DEBUG`, `CODAI_LOG_LEVEL`. Priority: environment > config.json > hardware-derived defaults.
+`model_url` enables the first-run download; leave it empty to disable. `model_size` is an optional expected byte count used to reject incomplete downloads.
+
+Environment overrides: `CODAI_PORT`, `CODAI_MODEL`, `CODAI_MODEL_URL`, `CODAI_MODEL_SIZE`, `CODAI_CTX`, `CODAI_THREADS`, `CODAI_HOST`, `CODAI_DEBUG`, `CODAI_LOG_LEVEL`. The desktop app also sets `CODAI_API_TOKEN`, `CODAI_BASE_PATH`, `CODAI_RESOURCE_PATH`, and `CODAI_NO_BROWSER`. Priority: environment > config.json > hardware-derived defaults.
 
 Logs land in `logs/codai.log`, `logs/engine.log`, `logs/crash.log`. Debug mode (`"debug": true`) also exposes `/logs` and the `/telemetry` page.
 
@@ -139,13 +171,16 @@ Logs land in `logs/codai.log`, `logs/engine.log`, `logs/crash.log`. Debug mode (
 - **RAM**: 4GB minimum, 8GB recommended
 - **Storage**: ~1GB for the app + 0.5–5GB for one model
 - **Runtime**: Python 3.10+ with `psutil` (source mode only), llama.cpp `llama-server` engine
-- **UI**: your browser — no GUI toolkit, no Electron, no internet
+- **UI**: Electron desktop app (packaged) or your browser (portable build)
+- **Node.js**: 20+ for building the desktop app from source
 
 ### Key Technologies
 - **Streaming chat** over SSE with stop support
+- **Session-token auth** and loopback `Host` validation on the local API
 - **Engine health monitor** with staged auto-restart (0s / 2s / 5s backoff)
-- **Hardware-aware tuning** — context and threads scale to the machine
-- **Single instance** — PID lock with stale-lock recovery
+- **Resource-aware tuning** — context and threads scale to the machine
+- **Single instance** — atomic PID lock with stale-lock and PID-reuse detection
+- **Resumable model download** with retry and size verification
 - **Rotating logs + crash reports** in `logs/`
 
 ---
