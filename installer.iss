@@ -14,16 +14,15 @@
 ; ==========================================================
 
 #define MyAppName "Codai Pro"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "3.0.0"
 #define MyAppPublisher "Codai"
 #define MyAppURL "https://github.com/Luckyyaduvanshiofficial/Codaipro"
 #define MyAppExeName "run.bat"
-#define MyAppIcon "docs\image\codai.ico"
-#define BundledModel AddBackslash(SourcePath) + "models\\gemma-3-1b-it-Q4_K_M.gguf"
+#define MyAppIcon "ui\codai.ico"
 
 [Setup]
-; Unique app identifier (generate a new GUID for your project at https://www.guidgenerator.com/)
-AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+; Unique app identifier. Keep this value fixed across releases so upgrades work.
+AppId={{6F3C2B1E-8D4A-4C7B-9E21-5A0D3F7B8C42}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
@@ -43,11 +42,11 @@ DisableProgramGroupPage=yes
 ; Output installer settings
 OutputDir=build\installer
 OutputBaseFilename=CodaiPro_Setup_{#MyAppVersion}
+SetupIconFile={#MyAppIcon}
 Compression=lzma2/max
 SolidCompression=yes
 
 ; Visual settings
-SetupIconFile={#MyAppIcon}
 WizardStyle=modern
 WizardSizePercent=110
 
@@ -58,25 +57,17 @@ PrivilegesRequiredOverridesAllowed=dialog
 ; Misc
 DisableWelcomePage=no
 LicenseFile=LICENSE
-InfoAfterFile=readme.md
+InfoAfterFile=README.md
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-
-#if DirExists("models") == 0
-  #error "The models folder is missing. Add the bundled GGUF model before compiling the installer."
-#endif
-
-#if FileExists(BundledModel) == 0
-  #error "The bundled model file models\\gemma-3-1b-it-Q4_K_M.gguf is missing relative to the installer script. Add it before compiling the installer."
-#endif
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-; Main executable
-Source: "Codai.exe"; DestDir: "{app}"; Flags: ignoreversion
+; Packaged runtime built by "pyinstaller Codai.spec" (optional; run.bat falls back to Python)
+Source: "dist\Codai.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; Launcher script
 Source: "run.bat"; DestDir: "{app}"; Flags: ignoreversion
@@ -102,7 +93,6 @@ Source: "ui\app.js"; DestDir: "{app}\ui"; Flags: ignoreversion
 Source: "ui\styles.css"; DestDir: "{app}\ui"; Flags: ignoreversion
 Source: "ui\logs.html"; DestDir: "{app}\ui"; Flags: ignoreversion
 Source: "ui\codai.ico"; DestDir: "{app}\ui"; Flags: ignoreversion
-Source: "ui\logo.ico"; DestDir: "{app}\ui"; Flags: ignoreversion
 Source: "ui\logo.png"; DestDir: "{app}\ui"; Flags: ignoreversion
 
 ; Documentation
@@ -111,7 +101,7 @@ Source: "help.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "kill.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "config.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "readme.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "docs\contributor-project-info.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 Source: "docs\docs_Plan.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 Source: "docs\prd.md"; DestDir: "{app}\docs"; Flags: ignoreversion
