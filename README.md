@@ -189,6 +189,8 @@ Logs land in `logs/codai.log`, `logs/engine.log`, `logs/crash.log`. Debug mode (
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and the developer deep-dive in [docs/contributor-project-info.md](docs/contributor-project-info.md). Bug reports and model-compatibility reports are very welcome via [issues](https://github.com/Luckyyaduvanshiofficial/Codaipro/issues).
 
+**Building the Windows app?** Start with [WINDOWS_HANDOFF.md](WINDOWS_HANDOFF.md). It covers the build steps, the architecture, the environment variables, and the gotchas, and it is written to be understood without any prior context.
+
 ## 👨‍💻 About the Developer
 
 <div align="center">
