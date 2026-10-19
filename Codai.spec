@@ -2,11 +2,13 @@
 
 
 a = Analysis(
-    ['dev\\controller.py'],
+    ['dev/controller.py'],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=['dev.config', 'dev.system', 'dev.engine', 'dev.proxy', 'psutil'],
+    hiddenimports=[
+        'dev.config', 'dev.system', 'dev.engine', 'dev.proxy', 'dev.downloader', 'psutil',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

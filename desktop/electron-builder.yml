@@ -1,0 +1,43 @@
+appId: com.codai.pro
+productName: Codai Pro
+copyright: Copyright (c) 2026 Codai
+directories:
+  output: ../build/desktop
+  buildResources: assets
+files:
+  - src/**/*
+  - assets/**/*
+  - package.json
+  - "!**/*.map"
+extraResources:
+  # Packaged Python runtime (built by: pyinstaller Codai.spec).
+  - from: ../dist/Codai.exe
+    to: runtime/Codai.exe
+  # Engine binaries (llama-server.exe and its DLLs).
+  - from: ../engine
+    to: engine
+    filter:
+      - "**/*"
+  # Optional bundled model. When absent the app downloads it on first run.
+  - from: ../models
+    to: models
+    filter:
+      - "*.gguf"
+  - from: ../config.json
+    to: config.json
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: assets/icon.ico
+  artifactName: "CodaiPro_Setup_${version}.${ext}"
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Codai Pro
+  uninstallDisplayName: Codai Pro
+  deleteAppDataOnUninstall: false
