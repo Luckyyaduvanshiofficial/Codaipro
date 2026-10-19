@@ -341,6 +341,34 @@ code {
 }
 
 /* --------------------------------------------------------------------------
+   App screenshot — framed like the answer sheet
+   -------------------------------------------------------------------------- */
+
+.shot {
+    padding-block: 72px 0;
+}
+
+.shot figure {
+    border: 1px solid var(--ink);
+    background: var(--paper-raised);
+    padding: 8px;
+}
+
+.shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.shot figcaption {
+    font-family: var(--sans);
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    text-align: center;
+    padding-top: 10px;
+}
+
+/* --------------------------------------------------------------------------
    Syllabus — numbered editorial rows
    -------------------------------------------------------------------------- */
 
