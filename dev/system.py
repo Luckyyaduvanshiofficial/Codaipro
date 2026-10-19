@@ -63,8 +63,10 @@ def analyze_system_resources(config: CodaiConfig) -> None:
                 config.ram_tier, tier_ctx, tier_threads,
             )
 
-        config.ctx = tier_ctx
-        config.threads = min(physical_cores, tier_threads)
+        if "ctx" not in config.overrides:
+            config.ctx = tier_ctx
+        if "threads" not in config.overrides:
+            config.threads = min(physical_cores, tier_threads)
         logger.info(
             "Final settings -> ctx=%d, threads=%d", config.ctx, config.threads
         )
@@ -73,8 +75,10 @@ def analyze_system_resources(config: CodaiConfig) -> None:
         logger.warning(
             "Could not probe hardware (%s). Defaulting to fail-safe mode.", exc
         )
-        config.ctx = 512
-        config.threads = 1
+        if "ctx" not in config.overrides:
+            config.ctx = 512
+        if "threads" not in config.overrides:
+            config.threads = 1
         config.ram_tier = "Tier 3 (Fail-safe)"
 
 
