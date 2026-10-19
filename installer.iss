@@ -14,7 +14,7 @@
 ; ==========================================================
 
 #define MyAppName "Codai Pro"
-#define MyAppVersion "3.0.0"
+#define MyAppVersion "3.1.0"
 #define MyAppPublisher "Codai"
 #define MyAppURL "https://github.com/Luckyyaduvanshiofficial/Codaipro"
 #define MyAppExeName "run.bat"
