@@ -95,7 +95,7 @@ code {
 
 .masthead-row {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: var(--u4);
     padding-block: var(--u4);
@@ -103,16 +103,20 @@ code {
 }
 
 .wordmark {
-    font-family: var(--serif);
-    font-size: 1.4rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    line-height: 0;
     text-decoration: none;
 }
 
-.wordmark .dot {
-    color: var(--red);
+.wordmark img {
+    display: block;
+    height: 34px;
+    width: auto;
+}
+
+.colophon .wordmark img {
+    height: 30px;
 }
 
 .site-nav {

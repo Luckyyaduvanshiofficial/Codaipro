@@ -14,7 +14,12 @@
     <meta property="og:url" content="https://luckyyaduvanshiofficial.github.io/Codaipro/">
     <meta property="og:title" content="Codai Pro — the offline AI coding assistant for students">
     <meta property="og:description" content="A native desktop AI coding assistant that runs on your own machine. The installer includes the model, so it works offline immediately. No internet, no accounts, no API keys. Built for lab exams and restricted networks.">
-    <meta name="twitter:card" content="summary">
+    <meta property="og:image" content="https://luckyyaduvanshiofficial.github.io/Codaipro/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Codai Pro logo">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://luckyyaduvanshiofficial.github.io/Codaipro/og-image.png">
 
     <!-- Structured data -->
     <script type="application/ld+json">
@@ -45,13 +50,19 @@
                  async src="https://gc.zgo.at/count.js"></script>
          A lightweight live view counter is already active in the footer. -->
 
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23f6f4ee'/%3E%3Ctext x='32' y='46' font-family='Georgia, serif' font-size='40' font-weight='bold' fill='%23c23a24' text-anchor='middle'%3EC.%3C/text%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="manifest" href="site.webmanifest">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <header class="masthead">
         <div class="wrap masthead-row">
-            <a class="wordmark" href="#top">CodaiPro<span class="dot">.</span></a>
+            <a class="wordmark" href="#top" aria-label="Codai Pro home">
+                <img src="logo-primary.svg" alt="Codai Pro" width="103" height="34">
+            </a>
             <nav class="site-nav" aria-label="Site">
                 <a href="https://codaipro.com/" target="_blank" rel="noopener">Main site ↗</a>
                 <a href="#syllabus">Syllabus</a>
@@ -329,7 +340,9 @@
     <footer class="colophon">
         <div class="wrap colophon-row">
             <div>
-                <p class="wordmark">CodaiPro<span class="dot">.</span></p>
+                <a class="wordmark" href="#top" aria-label="Codai Pro home">
+                    <img src="logo-primary.svg" alt="Codai Pro" width="91" height="30">
+                </a>
                 <p class="colophon-tag">An offline AI coding assistant for students, by a student.</p>
             </div>
             <nav class="colophon-nav" aria-label="Footer">
