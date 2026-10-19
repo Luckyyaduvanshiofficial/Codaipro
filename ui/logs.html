@@ -129,7 +129,8 @@
     </div>
 
     <script>
-        const baseUrl = window.location.protocol === "file:" ? "http://127.0.0.1:8080" : window.location.origin;
+        const baseUrl = window.location.origin;
+        const apiToken = document.querySelector('meta[name="codai-token"]')?.content || "";
         const proxyDiv = document.getElementById('proxy-logs');
         const engineDiv = document.getElementById('engine-logs');
         const terminal = document.getElementById('terminal');
@@ -147,13 +148,17 @@
 
         async function fetchLogs() {
             try {
-                const resp = await fetch(`${baseUrl}/logs`);
+                const resp = await fetch(`${baseUrl}/logs`, {
+                    headers: { 'X-Codai-Token': apiToken },
+                    cache: 'no-store',
+                });
                 if (resp.status === 403) {
+                    overlay.querySelector('p').textContent = 'Debug mode is currently disabled in the backend.';
                     overlay.style.display = 'flex';
                     return;
                 }
                 if (!resp.ok) {
-                    // For other errors (e.g., 500), show overlay or log error
+                    overlay.querySelector('p').textContent = `Could not load logs (HTTP ${resp.status}).`;
                     overlay.style.display = 'flex';
                     console.error(`Failed to fetch logs: HTTP ${resp.status}`);
                     return;

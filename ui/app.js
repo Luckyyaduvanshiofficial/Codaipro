@@ -17,16 +17,34 @@ const State = {
     startupPhase: "initializing",
     lastRequestId: null,
     backendPort: 8080,
+    apiToken: document.querySelector('meta[name="codai-token"]')?.content || "",
     conversation: [],
     maxHistoryMessages: 4,
     maxHistoryChars: 1200,
     get backendUrl() {
-        return window.location.protocol === "file:" ? `http://127.0.0.1:${this.backendPort}` : window.location.origin;
+        return window.location.origin;
     },
     get engineUrl() {
         return `http://127.0.0.1:${this.backendPort + 1}/`;
     }
 };
+
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, ch => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[ch]));
+}
+
+function apiHeaders(extra = {}) {
+    return { ...extra, "X-Codai-Token": State.apiToken };
+}
+
+class StreamInterruptedError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "StreamInterruptedError";
+    }
+}
 
 const FRONTEND_ERROR_COOLDOWN_MS = 4000;
 const FrontendErrorState = {
@@ -124,7 +142,7 @@ function forwardFrontendError(kind, details) {
 
     fetch(`${State.backendUrl}/frontend-error`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: apiHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
             kind,
             ...details,
@@ -234,6 +252,7 @@ const SystemBridge = {
         try {
             const response = await fetch(`${State.backendUrl}/health`, {
                 method: 'GET',
+                cache: 'no-store',
                 signal: AbortSignal.timeout(3000)
             });
 
@@ -332,7 +351,7 @@ const SystemBridge = {
     _showNotification(message, type = 'default', showSpinner = false) {
         if (!this.els.notification) return;
         const spinner = showSpinner ? '<div class="notif-spinner"></div>' : '';
-        this.els.notification.innerHTML = `${spinner}<span>${message}</span>`;
+        this.els.notification.innerHTML = `${spinner}<span>${escapeHtml(message)}</span>`;
         this.els.notification.className = `system-notification ${type}`;
     },
 
@@ -501,7 +520,7 @@ const UI = {
             <div class="error-card">
                 <div class="error-text">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                    System Error: ${this.escapeInline(msg)}
+                    System Error: ${escapeHtml(msg)}
                 </div>
                 <div class="error-actions">
                     <button class="retry-btn ripple" onclick="this.parentElement.parentElement.remove()" style="border-color: var(--text-tertiary); color: var(--text-tertiary);">Dismiss</button>
@@ -564,7 +583,7 @@ const API = {
         try {
             const response = await fetch(`${State.backendUrl}/v1/chat/completions`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 signal: State.abortController.signal,
                 body: JSON.stringify({
                     messages: requestMessages,
@@ -592,7 +611,9 @@ const API = {
 
             const { bubble: answerBubble } = UI.createBubble(false);
             finalBubbleReference = answerBubble;
-            streamedText = await this.consumeStream(response, answerBubble);
+            streamedText = await this.consumeStream(response, answerBubble, (text) => {
+                streamedText = text;
+            });
             const aiCompleteText = streamedText.trim();
             if (!aiCompleteText) {
                 throw new Error("Model returned malformed or empty output.");
@@ -605,7 +626,12 @@ const API = {
             UI.clearTimers();
 
             if (err.name === 'AbortError') {
-                if (finalBubbleReference?.parentElement) {
+                const partial = streamedText.trim();
+                if (partial) {
+                    rememberTurn("user", promptText);
+                    rememberTurn("assistant", partial);
+                    this.finalizeResponse(partial, startTime, finalBubbleReference, true);
+                } else if (finalBubbleReference?.parentElement) {
                     finalBubbleReference.parentElement.remove();
                 }
                 UI.updateStatus('Stopped', 'default');
@@ -642,7 +668,7 @@ const API = {
         UI.updateStatus("Stopped", "default");
     },
 
-    async consumeStream(response, bubbleElem) {
+    async consumeStream(response, bubbleElem, onProgress = () => {}) {
         const reader = response.body?.getReader();
         if (!reader) {
             throw new Error("Streaming response body is unavailable.");
@@ -653,6 +679,20 @@ const API = {
         let fullText = "";
         let completeReceived = false;
 
+        const handlers = {
+            append: chunk => {
+                if (!chunk) return;
+                fullText += chunk;
+                onProgress(fullText);
+                bubbleElem.textContent = fullText;
+                bubbleElem.style.whiteSpace = "pre-wrap";
+                UI.scrollBottom();
+            },
+            markComplete: () => {
+                completeReceived = true;
+            }
+        };
+
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
@@ -662,40 +702,22 @@ const API = {
             while (boundaryIndex !== -1) {
                 const rawEvent = buffer.slice(0, boundaryIndex);
                 buffer = buffer.slice(boundaryIndex + 2);
-                this.processStreamEvent(rawEvent, bubbleElem, {
-                    append: chunk => {
-                        if (!chunk) return;
-                        fullText += chunk;
-                        bubbleElem.textContent = fullText;
-                        bubbleElem.style.whiteSpace = "pre-wrap";
-                        UI.scrollBottom();
-                    },
-                    markComplete: () => {
-                        completeReceived = true;
-                    }
-                });
+                this.processStreamEvent(rawEvent, bubbleElem, handlers);
                 boundaryIndex = buffer.indexOf("\n\n");
             }
         }
 
         buffer += decoder.decode();
         if (buffer.trim()) {
-            this.processStreamEvent(buffer.trim(), bubbleElem, {
-                append: chunk => {
-                    if (!chunk) return;
-                    fullText += chunk;
-                    bubbleElem.textContent = fullText;
-                    bubbleElem.style.whiteSpace = "pre-wrap";
-                    UI.scrollBottom();
-                },
-                markComplete: () => {
-                    completeReceived = true;
-                }
-            });
+            this.processStreamEvent(buffer.trim(), bubbleElem, handlers);
         }
 
-        if (!completeReceived && !fullText.trim()) {
-            throw new Error("Stream ended without returning any text.");
+        if (!completeReceived) {
+            throw new StreamInterruptedError(
+                fullText.trim()
+                    ? "The response was cut off before it finished."
+                    : "Stream ended without returning any text."
+            );
         }
 
         return fullText;
@@ -720,6 +742,11 @@ const API = {
         if (envelope.status === "complete") {
             handlers.markComplete();
             return;
+        }
+
+        if (envelope.status === "error") {
+            const message = envelope.error?.message || "The response was interrupted.";
+            throw new StreamInterruptedError(message);
         }
 
         if (envelope.status !== "streaming") {
@@ -814,10 +841,11 @@ const Markdown = {
         // Phase 5: Re-insert cleanly built code blocks
         blocks.forEach((block, i) => {
             let lines = block.trim().split('\n');
-            let lang = lines[0].trim().match(/^[a-z0-9+#-]+$/i) ? lines.shift() : 'CODE';
+            let lang = lines[0].trim().match(/^[a-z0-9+#-]+$/i) && lines.length > 1 ? lines.shift().trim() : 'CODE';
             // Secure code contents natively
-            let safeCode = this.escapeStrict(lines.join('\n'));
-            let encodedCode = encodeURIComponent(safeCode);
+            let rawCode = lines.join('\n');
+            let safeCode = this.escapeStrict(rawCode);
+            let encodedCode = encodeURIComponent(rawCode);
             
             const header = `
                 <div class="code-header">
@@ -829,22 +857,16 @@ const Markdown = {
                     </div>
                 </div>`;
             
-            structure = structure.replace(`__CODE_BLOCK_${i}__`, `${header}<pre class="has-header"><code>${safeCode}</code></pre>`);
+            const replacement = `${header}<pre class="has-header"><code>${safeCode}</code></pre>`;
+            structure = structure.split(`__CODE_BLOCK_${i}__`).join(replacement);
         });
         
         return `<div class="markdown-body">${structure}</div>`;
     },
 
     cleanCodeFormat(encodedCode) {
-        let text = decodeURIComponent(encodedCode);
-        // Reverse HTML escape specifically for clipboard extraction
-        text = text.replace(/&amp;/g, '&')
-                   .replace(/&lt;/g, '<')
-                   .replace(/&gt;/g, '>')
-                   .replace(/&quot;/g, '"')
-                   .replace(/&#39;/g, "'");
-        // Trim leading and trailing spacing, normalize Windows breaks
-        return text.replace(/\r\n/g, '\n').trim();
+        // Code is encoded from raw text, so it needs no HTML unescaping.
+        return decodeURIComponent(encodedCode).replace(/\r\n/g, '\n').trim();
     },
 
     copyAllCode() {}
@@ -864,10 +886,16 @@ window.useSuggestion = (text) => {
 window.copySnippet = (encodedCode, btn) => {
     const cleanText = Markdown.cleanCodeFormat(encodedCode);
     navigator.clipboard.writeText(cleanText).then(() => {
-        const oh = btn.innerHTML;
+        if (!btn.dataset.originalHtml) {
+            btn.dataset.originalHtml = btn.innerHTML;
+        }
         btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12" stroke="#10a37f" stroke-width="2.5"></polyline></svg> <span style="color:#10a37f">Copied</span>`;
-        setTimeout(() => { btn.innerHTML = oh; }, 2000);
-    });
+        clearTimeout(btn._restoreTimer);
+        btn._restoreTimer = setTimeout(() => {
+            btn.innerHTML = btn.dataset.originalHtml;
+            delete btn.dataset.originalHtml;
+        }, 2000);
+    }).catch(error => console.error("Clipboard write failed:", error));
 };
 
 // Application Boot
