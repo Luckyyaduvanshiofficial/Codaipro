@@ -107,8 +107,28 @@ Codaipro2.0/
 # Engine binary is downloaded per-machine / fetched in CI
 engine/
 
+# Desktop (Electron) app
+desktop/node_modules/
+desktop/build/
+desktop/out/
+desktop/smoke.js
+desktop/diag.js
+desktop/probe*.js
+desktop/trace*.js
+desktop/verify*.js
+desktop/inspect*.js
+desktop/state.js
+desktop/shot*.js
+desktop/themecheck*.js
+
 # Exceptions: these are tracked even though generic rules above ignore them
 !Codai.spec
 !config.json
 !test_proxy.py
 !help.txt
+!tests/
+!tests/**
+!tests/*.py
+tests/__pycache__/
+!desktop/test/
+!desktop/test/**
