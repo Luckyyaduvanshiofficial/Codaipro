@@ -2,18 +2,15 @@ CODAI PRO HELP
 ===============
 
 What Codai Pro is
-Codai Pro is a local offline AI coding assistant. It starts a local engine, exposes a local proxy, and opens the browser UI on your machine. No cloud account is required for the core local flow.
-
-Default local addresses
-- UI / Proxy: http://127.0.0.1:8081/
-- Health: http://127.0.0.1:8081/health
-- Shutdown: http://127.0.0.1:8081/shutdown
-- Engine: http://127.0.0.1:8082/
+Codai Pro is a local offline AI coding assistant. The Windows installer runs a
+native desktop window; the portable build opens the local UI in your browser.
+No cloud account is required.
 
 How to run
-1. Double-click run.bat from the install folder, or launch Codai Pro from the Start Menu / desktop shortcut.
-2. Wait for the launcher to report that Codai is ready.
-3. Your browser should open automatically to the local UI.
+1. Installer: double-click CodaiPro_Setup.exe. It extracts, installs, and
+   launches Codai Pro automatically.
+2. Portable: double-click run.bat.
+3. Wait for the app or launcher to report that Codai is ready.
 
 How to stop
 - Close the launcher window normally when you are done.
@@ -55,13 +52,12 @@ Troubleshooting
   kill.bat did not find any Codai-owned processes. This is normal if the app is already stopped.
 
 Developer notes
-- Main detailed documentation: Documentation.md
-- Contributor onboarding guide: docs\contributor-project-info.md
-- Product overview and quickstart: readme.md
+- Project overview: README.md
+- Contributor onboarding: docs\contributor-project-info.md
+- Windows build and architecture: WINDOWS_HANDOFF.md
 
 Release checklist
-1. Verify the model exists in models\ before compiling installer.iss.
-2. Compile installer.iss in Inno Setup.
-3. Confirm the installer size reflects the bundled model.
-4. Install the built package on a clean path and verify the UI opens on 127.0.0.1:8081.
+1. Build everything with: powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+2. Confirm the installer bundle includes the default model and MSVC runtime.
+3. Install the built package and verify the desktop app opens and answers a message.
 

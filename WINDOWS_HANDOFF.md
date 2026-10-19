@@ -9,6 +9,13 @@ Last updated: 2026-10-19
 Repository: https://github.com/Luckyyaduvanshiofficial/Codaipro
 Branch: `main` at commit `90e2933` (pushed, in sync with `origin/main`)
 
+> **Update (2026-10-19): the Windows build is complete and verified.**
+> `dist\Codai.exe`, the NSIS installer, and the single-file portable exe were
+> built on Windows 11 and tested end to end (install, launch, chat, uninstall).
+> The installer is one-click and bundles the default model and the MSVC runtime.
+> Startup checks and the model-ready gate were added. Tests are now **36 Python**
+> and **14 desktop**. The `v3.1.0` tag has **not** been created yet.
+
 ---
 
 ## 1. Where the project stands
@@ -171,9 +178,9 @@ Do not "fix" these — they were tested end to end:
   `engine/`). The build script downloads it. Do not commit engine binaries.
 - **`config.json` is tracked despite a generic ignore rule** (there is a
   negation entry). Keep it that way — the build needs it.
-- **Version numbers live in four places:** `desktop/package.json`,
-  `desktop/package-lock.json` (root `version` and `packages.""`),
-  `installer.iss` (`MyAppVersion`), and any release tag. Keep them equal.
+- **Version numbers live in three places:** `desktop/package.json`,
+  `desktop/package-lock.json` (root `version` and `packages.""`), and the
+  release tag. Keep them equal.
 - **`Codai.spec` uses `dev/controller.py`** (forward slashes) and lists
   `dev.downloader` in `hiddenimports`. If you add a new `dev/*.py` module that is
   imported dynamically, add it there too.
@@ -193,6 +200,7 @@ dev/                     Python runtime
 desktop/                 Electron app
   src/main/main.js       windows, tray, IPC, single instance
   src/main/runtime.js    spawns Codai.exe / dev/controller.py
+  src/main/preflight.js  file, model, disk, and memory checks
   src/main/chat.js       SSE client + request validation
   src/main/store.js      JSON persistence (atomic, sanitized)
   src/preload/           contextBridge allow-lists
@@ -217,12 +225,12 @@ WINDOWS_HANDOFF.md       this file
 ```powershell
 # Python
 pip install -r requirements.txt pytest
-python -m pytest tests/ -q          # expect: 34 passed
+python -m pytest tests/ -q          # expect: 36 passed
 
 # Desktop
 cd desktop
 npm ci --include=dev
-npm test                            # expect: 8 passed
+npm test                            # expect: 14 passed
 ```
 
 The Python tests contain no platform-specific branches (`os.name`,

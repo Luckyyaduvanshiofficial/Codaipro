@@ -1,5 +1,9 @@
 # Contributor Project Info
 
+> **v3.1 note:** The packaged Windows release runs an Electron desktop app in
+> `desktop/`. The Python runtime, proxy, and engine described below are still
+> the core. The browser UI in `ui/` remains for the portable build.
+
 This document is for contributors who are new to the project. Read it like a senior engineer giving you the map before you start changing things.
 
 ## Start Here
@@ -7,38 +11,38 @@ This document is for contributors who are new to the project. Read it like a sen
 If you only remember three things, remember these:
 
 1. The real development runtime is the Python controller, not the packaged exe.
-2. The proxy is the center of the app. The UI talks to the proxy, and the proxy talks to the engine.
+2. The proxy is the center of the app. The desktop main process (or the browser UI) talks to the proxy, and the proxy talks to the engine.
 3. Shutdown matters. If you bypass the controller's shutdown path, you will create confusing bugs around stale locks and orphaned processes.
 
 ## What This Project Actually Is
 
-Codai Pro is not a giant platform. It is a small local runtime with four moving parts:
+Codai Pro is not a giant platform. It is a small local runtime with five moving parts:
 
-- `run.bat` starts the app for Windows users
+- `desktop/src/main/main.js` embeds the runtime in the packaged Windows app
+- `run.bat` starts the app for the portable build
 - `dev/controller.py` orchestrates startup and shutdown
 - `dev/proxy.py` serves the UI and forwards requests
 - `dev/engine.py` owns the `llama-server.exe` subprocess
 
-The browser UI is thin by design. Most operational truth lives in the Python runtime.
+The renderer is thin by design. Most operational truth lives in the Python runtime.
 
 ## How Requests Flow
 
 When the app is working normally, the flow looks like this:
 
-1. The launcher starts the controller.
+1. The Electron main process (or `run.bat`, for portable) starts the controller.
 2. The controller starts the proxy.
 3. The controller starts the engine.
-4. The UI loads from the proxy.
-5. The UI sends chat requests to the proxy.
-6. The proxy forwards those requests to the engine.
-7. The proxy returns a normalized response back to the UI.
+4. The desktop renderer asks the main process over IPC; the main process calls the proxy. The portable UI calls the proxy directly.
+5. The proxy forwards chat requests to the engine.
+6. The proxy returns a normalized response.
 
 That means if chat is broken, you should think in this order:
 
-- is the launcher lying about readiness?
+- did the preflight checks pass?
 - is the proxy up?
-- is the engine up?
-- is the UI talking to the right port?
+- is the engine up and has the model finished loading?
+- is the renderer talking to the right port?
 - is the proxy translating requests correctly?
 
 ## File Map You Should Know
@@ -113,9 +117,13 @@ It handles:
 
 Be careful here. Small changes in process handling can create hard-to-debug Windows issues.
 
+### `desktop/src/main/preflight.js`
+
+This runs before the runtime starts. It checks the bundled runtime, engine, required DLLs, model file, disk space, and available memory. If anything is missing it blocks launch with an actionable recovery dialog rather than opening a broken window.
+
 ### `ui/app.js`
 
-This is the main browser runtime.
+This is the portable browser UI runtime.
 
 It polls `/health`, controls UI state, sends chat messages, and reacts to failure conditions. It is intentionally framework-free, so clarity matters more than cleverness.
 
@@ -200,12 +208,14 @@ That habit prevents the classic mistake of fixing one layer while leaving the la
 
 If you are onboarding, read these in order:
 
-1. `readme.md`
-2. `run.bat`
-3. `dev/controller.py`
-4. `dev/proxy.py`
-5. `dev/engine.py`
-6. `ui/app.js`
+1. `README.md`
+2. `WINDOWS_HANDOFF.md`
+3. `desktop/src/main/main.js`
+4. `desktop/src/main/preflight.js`
+5. `dev/controller.py`
+6. `dev/proxy.py`
+7. `dev/engine.py`
+8. `ui/app.js` (portable build)
 
 After that, the codebase is small enough that you can navigate most issues confidently.
 

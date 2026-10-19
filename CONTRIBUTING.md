@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to CodaiPro! This document provides guidelines and information for contributors.
 
+> **Building the Windows desktop app?** Read [WINDOWS_HANDOFF.md](WINDOWS_HANDOFF.md) first. It explains the build steps, the architecture, and the environment variables, and is written to be understood without prior context.
+
 ## 🌟 Ways to Contribute
 
 ### 🐛 Bug Reports
@@ -72,13 +74,18 @@ test(core): add unit tests for launcher
 
 ### Testing
 ```bash
-# Smoke-test the proxy endpoints (runtime must be running)
-python test_proxy.py
+# Python tests
+python -m pytest tests/ -q
+
+# Desktop tests
+cd desktop
+npm ci --include=dev
+npm test
 
 # Run from source
 python dev/controller.py
 
-# Windows launcher + cleanup
+# Windows launcher + cleanup (portable build)
 run.bat
 kill.bat
 ```
@@ -122,13 +129,14 @@ Add screenshots for UI changes
 ```
 CodaiPro/
 ├── dev/                      # Python controller (config, engine, proxy, system)
-├── ui/                       # Browser chat UI
+├── desktop/                  # Electron desktop app (main, preload, renderer)
+├── ui/                       # Browser chat UI (portable build)
 ├── engine/                   # llama-server binary (not in git)
 ├── models/                   # GGUF models (not in git)
 ├── config.json               # Runtime configuration
-├── run.bat / kill.bat        # Windows launcher / cleanup
+├── run.bat / kill.bat        # Portable launcher / cleanup
 ├── Codai.spec                # PyInstaller packaging
-├── installer.iss             # Inno Setup installer
+├── build-windows.ps1         # One-command Windows build
 ├── website/                  # Public site (GitHub Pages)
 ├── docs/                     # Architecture docs and diagrams
 └── .github/workflows/        # Release + Pages automation
