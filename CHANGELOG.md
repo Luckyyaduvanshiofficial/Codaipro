@@ -17,6 +17,17 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Brand accent colors replace the old green and blue in the desktop app, the
   browser UI, and the logs page.
 
+### Changed
+
+- Startup problems now appear as a friendly card: a plain-language title, a
+  short explanation, a hint, **Try again** and **Open logs** buttons, and the
+  raw error hidden under "Technical details". The old UI dumped the entire log
+  tail into the window.
+- The starter prompts are now built for lab exams and coding practice: a C
+  program, a Python exercise, a DSA explanation, and a SQL query. The welcome
+  copy and empty state point at the same use case.
+- The status pill reads "Engine offline" instead of "Engine stopped".
+
 ### Fixed
 
 - The app refused to launch from a source checkout because the preflight

@@ -91,3 +91,25 @@ test('runtime resolves Codai.exe for packaged builds and the controller for sour
   assert.match(source.args[0], /dev[\\/]controller\.py$/);
 });
 
+
+const { describeStartupError } = require('../src/main/errors');
+
+test('startup failures are explained in plain language', () => {
+  const engine = describeStartupError(new Error('Missing engine binary: /x/engine/llama-server'));
+  assert.match(engine.title, /engine/i);
+  assert.doesNotMatch(engine.message, /llama-server|exit code/i);
+  assert.match(engine.detail, /llama-server/);
+
+  const model = describeStartupError(new Error('Missing model file: /x/models/m.gguf'));
+  assert.match(model.title, /model/i);
+
+  const runtime = describeStartupError(new Error('spawn /usr/bin/python ENOENT'));
+  assert.match(runtime.title, /runtime/i);
+
+  const stopped = describeStartupError(new Error('The AI engine stopped unexpectedly. exit code 1'));
+  assert.match(stopped.title, /stopped/i);
+
+  const generic = describeStartupError(new Error('boom'));
+  assert.equal(generic.title, "Codai Pro couldn't start");
+  assert.equal(generic.detail, 'boom');
+});

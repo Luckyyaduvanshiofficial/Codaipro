@@ -16,6 +16,7 @@ const { RuntimeManager } = require('./runtime');
 const { streamChat, validateChatRequest, ChatError } = require('./chat');
 const { DataStore, sanitizeSettings } = require('./store');
 const { runPreflight } = require('./preflight');
+const { describeStartupError } = require('./errors');
 
 const IS_DEV = !app.isPackaged;
 
@@ -275,11 +276,14 @@ function registerIpc() {
   ipcMain.handle('runtime:restart', async () => {
     try {
       await startRuntime();
+      lastRuntimeError = null;
       watchRuntime();
       showMainWindow();
       return { ready: true };
     } catch (error) {
-      return { ready: false, error: error.message };
+      lastRuntimeError = describeStartupError(error);
+      sendToRenderer('runtime:error', lastRuntimeError);
+      return { ready: false, error: lastRuntimeError };
     }
   });
 
@@ -335,11 +339,11 @@ function watchRuntime() {
 
     runtimePort = null;
     runtimeToken = null;
-    lastRuntimeError = 'The AI engine stopped unexpectedly.';
-    sendToRenderer('runtime:error', { message: lastRuntimeError });
 
     let failure = info?.error?.message
       || `The runtime exited with code ${info?.code ?? 'unknown'}.`;
+    lastRuntimeError = describeStartupError(new Error(`The AI engine stopped unexpectedly. ${failure}`));
+    sendToRenderer('runtime:error', lastRuntimeError);
 
     while (!quitting) {
       const choice = await promptFailure({
@@ -416,8 +420,8 @@ async function boot() {
       showMainWindow();
       return;
     } catch (error) {
-      lastRuntimeError = error.message;
-      sendToRenderer('runtime:error', { message: error.message });
+      lastRuntimeError = describeStartupError(error);
+      sendToRenderer('runtime:error', lastRuntimeError);
 
       // In a source checkout, open the window and show the reason there instead of
       // trapping the developer behind a modal retry loop.

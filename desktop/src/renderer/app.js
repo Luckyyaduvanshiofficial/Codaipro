@@ -13,6 +13,13 @@
     status: document.getElementById('status'),
     statusText: document.getElementById('status-text'),
     notice: document.getElementById('notice'),
+    engineCard: document.getElementById('engine-card'),
+    ecTitle: document.getElementById('ec-title'),
+    ecMessage: document.getElementById('ec-message'),
+    ecHint: document.getElementById('ec-hint'),
+    ecDetail: document.getElementById('ec-detail'),
+    ecRetry: document.getElementById('ec-retry'),
+    ecLogs: document.getElementById('ec-logs'),
     thread: document.getElementById('thread'),
     welcome: document.getElementById('welcome'),
     messages: document.getElementById('messages'),
@@ -41,6 +48,7 @@
     activeId: null,
     generating: null,
     runtimeReady: false,
+    engineOffline: false,
     query: '',
   };
 
@@ -74,6 +82,53 @@
     els.notice.classList.add('hidden');
   }
 
+  // A startup problem is shown as a friendly card, with the raw error one click away.
+  function showEngineError(info) {
+    const payload = typeof info === 'string' ? { message: info } : (info || {});
+    state.engineOffline = true;
+    els.ecTitle.textContent = payload.title || "Codai Pro couldn't start";
+    els.ecMessage.textContent = payload.message || 'The local AI engine did not start.';
+    els.ecHint.textContent = payload.hint || '';
+    els.ecHint.classList.toggle('hidden', !payload.hint);
+    els.ecDetail.textContent = payload.detail || payload.message || '';
+    els.ecRetry.disabled = false;
+    els.ecRetry.textContent = 'Try again';
+    els.engineCard.classList.remove('hidden');
+    hideNotice();
+  }
+
+  function hideEngineError() {
+    state.engineOffline = false;
+    els.engineCard.classList.add('hidden');
+  }
+
+  els.ecRetry.addEventListener('click', async () => {
+    els.ecRetry.disabled = true;
+    els.ecRetry.textContent = 'Starting...';
+    state.engineOffline = false;
+    setStatus('Starting...', '');
+    refreshSendState();
+    try {
+      const result = await api.runtime.restart();
+      if (result && result.error) {
+        showEngineError(result.error);
+      }
+    } catch (error) {
+      showEngineError({
+        title: "Codai Pro couldn't start",
+        message: 'The engine did not start.',
+        hint: 'Open the logs to see what happened, then try again.',
+        detail: error.message,
+      });
+    } finally {
+      els.ecRetry.disabled = false;
+      els.ecRetry.textContent = 'Try again';
+      refreshSendState();
+    }
+  });
+
+  els.ecLogs.addEventListener('click', () => api.app.openLogs());
+
   const PHASE_TEXT = {
     initializing: 'Starting...',
     analyzing_hardware: 'Checking your computer...',
@@ -81,7 +136,7 @@
     loading_model: 'Loading the AI model...',
     binding_port: 'Almost ready...',
     ready: 'Ready',
-    crashed: 'Engine stopped',
+    crashed: 'Engine offline',
     shutting_down: 'Shutting down...',
   };
 
@@ -448,9 +503,14 @@
   function refreshSendState() {
     // Send stays available so the user can retry; an empty box simply does nothing until typed into.
     els.send.disabled = !state.runtimeReady || state.generating !== null;
-    els.input.placeholder = state.runtimeReady
-      ? 'Message Codai Pro...'
-      : 'Waiting for the AI engine to start...';
+    els.welcome.classList.toggle('is-disabled', !state.runtimeReady);
+    if (state.runtimeReady) {
+      els.input.placeholder = 'Message Codai Pro...';
+    } else if (state.engineOffline) {
+      els.input.placeholder = 'The engine is offline. Fix the problem above, then try again.';
+    } else {
+      els.input.placeholder = 'Waiting for the AI engine to start...';
+    }
   }
 
   function stopGeneration() {
@@ -581,15 +641,16 @@
 
   api.runtime.onReady(() => {
     state.runtimeReady = true;
+    hideEngineError();
     hideNotice();
     setStatus('Ready', 'ready');
     refreshSendState();
   });
 
-  api.runtime.onError(({ message }) => {
+  api.runtime.onError((payload) => {
     state.runtimeReady = false;
-    setStatus('Engine stopped', 'error');
-    showNotice(message, 'error');
+    setStatus('Engine offline', 'error');
+    showEngineError(payload);
     refreshSendState();
   });
 
@@ -606,12 +667,13 @@
     const runtime = await api.runtime.info();
     if (runtime.ready) {
       state.runtimeReady = true;
+      hideEngineError();
       setStatus('Ready', 'ready');
       refreshSendState();
     } else if (runtime.error) {
       state.runtimeReady = false;
-      setStatus('Engine stopped', 'error');
-      showNotice(runtime.error, 'error');
+      setStatus('Engine offline', 'error');
+      showEngineError(runtime.error);
       refreshSendState();
     } else {
       setStatus('Starting...', '');

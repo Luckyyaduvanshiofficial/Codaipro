@@ -43,23 +43,42 @@
 
             <div class="notice hidden" id="notice" role="alert"></div>
 
+            <section class="engine-card hidden" id="engine-card" role="alert" aria-live="assertive">
+                <div class="ec-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+                </div>
+                <div class="ec-body">
+                    <h2 class="ec-title" id="ec-title">The AI engine isn't ready</h2>
+                    <p class="ec-message" id="ec-message"></p>
+                    <p class="ec-hint" id="ec-hint"></p>
+                    <div class="ec-actions">
+                        <button class="ec-retry" id="ec-retry" type="button">Try again</button>
+                        <button class="ec-secondary" id="ec-logs" type="button">Open logs</button>
+                    </div>
+                    <details class="ec-details">
+                        <summary>Technical details</summary>
+                        <pre id="ec-detail"></pre>
+                    </details>
+                </div>
+            </section>
+
             <section class="thread" id="thread" aria-live="off">
                 <div class="welcome" id="welcome">
                     <img class="brand-mark" src="../../assets/app-icon.svg" width="56" height="56" alt="">
-                    <h1>What can I help you build?</h1>
-                    <p>Private and offline. Everything runs on your computer.</p>
+                    <h1>What are you working on?</h1>
+                    <p>Private and offline. Built for lab exams and coding practice.</p>
                     <div class="suggestions">
-                        <button class="suggestion" data-prompt="Write a Python script that reads a CSV file and prints the top 5 rows by a column.">
-                            <span class="s-title">Script</span><span class="s-text">Read a CSV and summarize it in Python</span>
+                        <button class="suggestion" data-prompt="Write a C program to reverse a string without using library functions.">
+                            <span class="s-title">C program</span><span class="s-text">Reverse a string without library functions</span>
                         </button>
-                        <button class="suggestion" data-prompt="Explain how React useEffect works, with a short example.">
-                            <span class="s-title">Explain</span><span class="s-text">How React useEffect works</span>
+                        <button class="suggestion" data-prompt="Write a Python function that checks whether a string is a palindrome, and explain how it works.">
+                            <span class="s-title">Python</span><span class="s-text">Check if a string is a palindrome</span>
                         </button>
-                        <button class="suggestion" data-prompt="Help me find the bug in this JavaScript: for (var i = 0; i < 3; i++) { setTimeout(() => console.log(i), 0); }">
-                            <span class="s-title">Debug</span><span class="s-text">Why does this log 3, 3, 3?</span>
+                        <button class="suggestion" data-prompt="Explain binary search and its time complexity with a short worked example.">
+                            <span class="s-title">DSA</span><span class="s-text">Binary search and its time complexity</span>
                         </button>
-                        <button class="suggestion" data-prompt="Write a SQL query that returns the top 5 customers by total revenue from orders(customer_id, amount).">
-                            <span class="s-title">Query</span><span class="s-text">Top customers by revenue in SQL</span>
+                        <button class="suggestion" data-prompt="Write a SQL query to find the second-highest salary in an employee table.">
+                            <span class="s-title">SQL</span><span class="s-text">Find the second-highest salary</span>
                         </button>
                     </div>
                 </div>
