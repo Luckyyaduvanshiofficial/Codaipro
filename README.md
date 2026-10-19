@@ -1,4 +1,4 @@
-# 🚀 Codai Pro v3.1 - Offline AI Coding Assistant
+# 🚀 Codai Pro v3.2 - Offline AI Coding Assistant
 
 <div align="center">
 
@@ -7,7 +7,7 @@
   <img alt="Codai Pro" src="branding/final/logo-light.svg" width="260">
 </picture>
 
-![CodaiPro Logo](https://img.shields.io/badge/CodaiPro-v3.1-blue?style=for-the-badge&logo=python)
+![CodaiPro Logo](https://img.shields.io/badge/CodaiPro-v3.2-blue?style=for-the-badge&logo=python)
 [![Open Source](https://img.shields.io/badge/Open%20Source-❤️-red?style=for-the-badge)](https://github.com/Luckyyaduvanshiofficial/Codaipro)
 [![Offline Ready](https://img.shields.io/badge/Works%20Offline-✅-green?style=for-the-badge)](https://github.com/Luckyyaduvanshiofficial/Codaipro)
 [![Student Friendly](https://img.shields.io/badge/Perfect%20for%20Labs-🎓-orange?style=for-the-badge)](https://github.com/Luckyyaduvanshiofficial/Codaipro)
@@ -22,11 +22,13 @@
 
 ---
 
-## What changed in v3.1
+## What changed in v3.2
 
-Codai Pro now has a **native Windows app**. It opens in its own window with a ChatGPT-style interface — conversation history, streaming answers, markdown with syntax-highlighted code, a stop button, and light/dark themes — instead of a browser tab. The installer **ships with the default model**, so the first launch only has to load it: no download and no model hunting before you can start.
+Codai Pro has a **new identity**. The approved Offset Frame mark now appears across the website, the desktop app, the installer, the executable, the tray, and the browser UI, with a warm paper-and-red palette in place of the old green and blue.
 
-Under the hood the local API is locked down: every request needs a per-session token, the `Host` header is validated against loopback to block DNS rebinding, and the wildcard CORS policy is gone. The engine also recovers from crashes instead of stalling.
+The app itself is built for lab work: a native Windows window with a ChatGPT-style chat, streaming answers, markdown with syntax-highlighted code, an assistant avatar, light and dark themes, and starter prompts aimed at common lab questions (C, Python, DSA, and SQL). Startup problems are explained in plain language with a **Try again** button instead of a raw log dump.
+
+The installer **ships with the default model**, so the first launch only has to load it. Under the hood the local API is locked down: every request needs a per-session token, the `Host` header is validated against loopback to block DNS rebinding, and the wildcard CORS policy is gone. The engine also recovers from crashes instead of stalling.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full list.
 
@@ -47,7 +49,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full list.
 **Installer (recommended)**
 
 ```text
-1. Download CodaiPro_Setup_3.1.0.exe from the releases page and run it
+1. Download CodaiPro_Setup_3.2.0.exe from the releases page and run it
 2. The one-click installer extracts and launches Codai Pro automatically
 3. Wait while it loads the bundled model (a few seconds)
 4. Chat
@@ -66,7 +68,7 @@ Both packages include `Codai.exe` and the official `engine\llama-server.exe`. Th
 installer also bundles the default model. If a model is missing, the first run
 downloads it; you can also drop any `.gguf` into `models/` yourself.
 
-**Fully offline USB:** download `CodaiPro-3.1.0-Portable-Offline-Windows.zip`,
+**Fully offline USB:** download `CodaiPro-3.2.0-Portable-Offline-Windows.zip`,
 extract it to the pendrive, and double-click `run.bat`. The model, engine, and
 MSVC runtime are included, so it needs no installation and no internet.
 

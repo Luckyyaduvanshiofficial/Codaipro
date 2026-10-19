@@ -5,7 +5,10 @@ All notable changes to Codai Pro are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.2.0] — 2026-10-19
+
+The brand and polish release. Codai Pro has a new identity, a friendlier chat
+window, and starter prompts built for lab exams.
 
 ### Added
 
@@ -16,6 +19,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   source package lives in `branding/`.
 - Brand accent colors replace the old green and blue in the desktop app, the
   browser UI, and the logs page.
+- An assistant avatar now appears beside replies, and the scrollbars use the
+  brand palette instead of the platform default.
+- A shortcut hint under the composer shows Enter to send and Shift+Enter for a
+  new line.
 
 ### Changed
 

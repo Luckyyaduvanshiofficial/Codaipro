@@ -1,4 +1,4 @@
-# Windows Handoff — Codai Pro v3.1.0
+# Windows Handoff — Codai Pro v3.2.0
 
 > **Read this first.** This file exists because the build was developed on Linux
 > and must be finished on Windows. A fresh assistant session on Windows should
@@ -7,21 +7,21 @@
 
 Last updated: 2026-10-19
 Repository: https://github.com/Luckyyaduvanshiofficial/Codaipro
-Branch: `main` at commit `90e2933` (pushed, in sync with `origin/main`)
+Branch: `main` (in sync with `origin/main`)
 
 > **Update (2026-10-19): the Windows build is complete and verified.**
 > `dist\Codai.exe`, the NSIS installer, and the single-file portable exe were
 > built on Windows 11 and tested end to end (install, launch, chat, uninstall).
 > The installer is one-click and bundles the default model and the MSVC runtime.
 > Startup checks and the model-ready gate were added. Tests are now **36 Python**
-> and **14 desktop**. The `v3.1.0` tag and GitHub release are published.
+> and **18 desktop**. The `v3.2.0` tag and GitHub release are published.
 
 ---
 
 ## 1. Where the project stands
 
 All development work is **done, committed, and pushed**. The Windows build is
-complete, the website is live with the v3.1 content, and the `v3.1.0` release
+complete, the website is live with the v3.2 content, and the `v3.2.0` release
 is published.
 
 | Area | Status |
@@ -29,16 +29,16 @@ is published.
 | Python runtime bug fixes + security hardening | Done, pushed |
 | Bundled model + first-run download fallback | Done, pushed, tested |
 | Electron desktop app (window, tray, chat UI) | Done, pushed |
-| Tests: 36 Python, 14 desktop | All passing |
-| Website update (v3.1) | Done, **deployed and verified live** |
+| Tests: 36 Python, 18 desktop | All passing |
+| Website update (v3.2) | Done, **deployed and verified live** |
 | Changelog, README, INSTALLATION.md, PRD | Done, pushed |
 | Release CI (builds installer on tag) | Done, pushed |
 | `dist\Codai.exe` | Built and verified on Windows 11 |
 | Windows `engine\llama-server.exe` | Downloaded by the build script and bundled |
-| NSIS installer | Built and published in the v3.1.0 release |
-| Git tag `v3.1.0` / GitHub release | Published with the installer and portable zip |
+| NSIS installer | Built and published in the v3.2.0 release |
+| Git tag `v3.2.0` / GitHub release | Published with the installer and portable zip |
 
-**The `v3.1.0` tag is now published.** The installer was built and checked
+**The `v3.2.0` tag is now published.** The installer was built and checked
 first; the tag triggered the release workflow, which published the installer
 and portable zip. Keep the same order for future releases.
 
@@ -64,7 +64,7 @@ The script performs three steps and stops with a clear error if any fails:
 2. Installs Python deps and runs `python -m PyInstaller Codai.spec`, producing
    `dist\Codai.exe`.
 3. Runs `npm ci --include=dev` and `electron-builder --win --x64` in `desktop\`,
-   producing `build\desktop\CodaiPro_Setup_3.1.0.exe`.
+   producing `build\desktop\CodaiPro_Setup_3.2.0.exe`.
 
 Useful flags:
 
@@ -75,7 +75,7 @@ Useful flags:
 
 ### Verify before publishing
 
-1. Run `build\desktop\CodaiPro_Setup_3.1.0.exe` on a clean machine or VM.
+1. Run `build\desktop\CodaiPro_Setup_3.2.0.exe` on a clean machine or VM.
 2. Launch Codai Pro from the Start menu.
 3. Confirm the splash progresses: download → loading model → chat window.
 4. Send a message and confirm the reply streams.
@@ -85,8 +85,8 @@ Useful flags:
 ### Then publish
 
 ```powershell
-git tag v3.1.0
-git push origin v3.1.0
+git tag v3.2.0
+git push origin v3.2.0
 ```
 
 That tag runs `.github/workflows/release.yml`, which rebuilds the installer on
@@ -94,7 +94,7 @@ That tag runs `.github/workflows/release.yml`, which rebuilds the installer on
 zip with release notes.
 
 Alternative: commit and push first, then create the release on GitHub, or use
-`gh release create v3.1.0 ...` — but the CI path is already configured and is
+`gh release create v3.2.0 ...` — but the CI path is already configured and is
 the intended one.
 
 ---
@@ -212,7 +212,7 @@ ui/                      browser UI for the portable build
 website/                 GitHub Pages site (auto-deploys on push)
 .github/workflows/       release.yml, website-pages.yml
 build-windows.ps1        one-command Windows build
-CHANGELOG.md             v3.1.0 release notes
+CHANGELOG.md             v3.2.0 release notes
 INSTALLATION.md          user install + troubleshooting
 docs/PRD.md              product requirements
 WINDOWS_HANDOFF.md       this file

@@ -1,6 +1,6 @@
 # Contributor Project Info
 
-> **v3.1 note:** The packaged Windows release runs an Electron desktop app in
+> **v3.2 note:** The packaged Windows release runs an Electron desktop app in
 > `desktop/`. The Python runtime, proxy, and engine described below are still
 > the core. The browser UI in `ui/` remains for the portable build.
 

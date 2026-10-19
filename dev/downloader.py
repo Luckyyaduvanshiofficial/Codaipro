@@ -19,7 +19,7 @@ from typing import Callable, Optional
 logger = logging.getLogger("codai.download")
 
 CHUNK_SIZE = 1024 * 256
-USER_AGENT = "CodaiPro/3.1"
+USER_AGENT = "CodaiPro/3.2"
 MAX_RETRIES = 3
 
 ProgressCallback = Callable[[int, int], None]

@@ -12,7 +12,7 @@ disk including the default model; larger models need more.
 ## Option 1: Desktop installer (recommended)
 
 ```text
-1. Download CodaiPro_Setup_3.1.0.exe from:
+1. Download CodaiPro_Setup_3.2.0.exe from:
    https://github.com/Luckyyaduvanshiofficial/Codaipro/releases/latest
 2. Run it. Windows SmartScreen may warn because the build is not code-signed.
    Choose "More info" → "Run anyway".
@@ -43,7 +43,7 @@ are kept so a reinstall picks up where you left off. Delete
 ## Option 2: Portable (no install)
 
 ```text
-1. Download CodaiPro-3.1.0-Portable-Windows.zip from the releases page.
+1. Download CodaiPro-v3.2.0-Portable-Windows.zip from the releases page.
 2. Right-click → Extract All to a WRITABLE folder (for example D:\CodaiPro
    or a USB drive). Do NOT use C:\Program Files — the app writes logs and
    models next to itself.
@@ -64,7 +64,7 @@ Use this when the lab PC has no internet connection and you want the model on
 the pendrive:
 
 ```text
-1. Download CodaiPro-3.1.0-Portable-Offline-Windows.zip.
+1. Download CodaiPro-3.2.0-Portable-Offline-Windows.zip.
 2. Extract the zip directly to a writable folder on the USB drive.
 3. Double-click run.bat on any Windows PC.
 ```
